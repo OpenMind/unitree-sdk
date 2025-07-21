@@ -8,6 +8,10 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_dir = get_package_share_directory('go2_sdk')
 
+    urdf_file = os.path.join(pkg_dir, 'urdf', 'go2.urdf')
+    with open(urdf_file, 'r') as infp:
+        robot_desc = infp.read()
+
     nav2_config_file = os.path.join(pkg_dir, 'config', 'nav2_params.yaml')
 
     channel_type = LaunchConfiguration('channel_type', default=EnvironmentVariable('LIDAR_CHANNEL_TYPE', default_value='serial'))
@@ -64,6 +68,21 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'map_yaml_file',
             description='Full path to map yaml file (leave empty for SLAM mode)'),
+
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{'robot_description': robot_desc}]
+        ),
+
+        Node(
+            package='go2_sdk',
+            executable='joint_state_publisher',
+            name='joint_state_publisher',
+            output='screen'
+        ),
 
         Node(
             package='rplidar_ros',

@@ -17,6 +17,14 @@ RUN apt-get update && apt-get install -y \
     ros-humble-foxglove-bridge \
     ros-humble-rmw-cyclonedds-cpp \
     ros-humble-joy \
+    ros-humble-builtin-interfaces \
+    ros-humble-std-msgs \
+    ros-humble-geometry-msgs \
+    ros-humble-rosidl-default-generators \
+    ros-humble-rosidl-default-runtime \
+    ros-humble-rosidl-generator-c \
+    ros-humble-rosidl-typesupport-c \
+    ros-humble-rosidl-typesupport-cpp \
     libportaudio2 \
     x11-apps \
     libsm6

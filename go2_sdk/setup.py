@@ -1,3 +1,5 @@
+import os
+from glob import glob
 from setuptools import find_packages, setup
 
 package_name = 'go2_sdk'
@@ -12,6 +14,9 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/slam_launch.py', 'launch/nav2_launch.py']),
         ('share/' + package_name + '/config', ['config/slam.yaml', 'config/rviz.rviz', 'config/nav2_params.yaml']),
+        ('share/' + package_name + '/urdf', ['urdf/go2.urdf']),
+        (os.path.join('share', package_name, 'dae'), glob(os.path.join('dae', '*'))),
+
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -26,6 +31,7 @@ setup(
             'cmd_vel_to_go2 = go2_sdk.go2_movement:main',
             'waypoint_manager = go2_sdk.waypoint_manager:main',
             'api = go2_sdk.api:main',
+            'joint_state_publisher = go2_sdk.joint_state:main',
         ],
     },
 )

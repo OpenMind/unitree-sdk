@@ -63,7 +63,7 @@ pip install -r requirements.txt
 ### 4. Build the packages:
 
 ```bash
-colcon build --packages-select unitree_api go2_sdk
+colcon build --packages-select unitree_api unitree_go go2_sdk
 ```
 
 ### 5. Source the workspace:

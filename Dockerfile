@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-rosidl-generator-c \
     ros-humble-rosidl-typesupport-c \
     ros-humble-rosidl-typesupport-cpp \
+    ros-humble-realsense2-camera \
     libportaudio2 \
     x11-apps \
     libsm6

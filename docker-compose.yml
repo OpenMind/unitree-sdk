@@ -40,3 +40,27 @@ services:
         max-size: "10m"
         max-file: "3"
     restart: unless-stopped
+
+  ros2_intel435:
+    build:
+      context: .
+    image: openmindagi/unitree_go2_sdk:latest
+    container_name: ros2_intel435
+    network_mode: host
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    command: "ros2 launch realsense2_camera rs_launch.py"
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+      - /sys:/sys:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped

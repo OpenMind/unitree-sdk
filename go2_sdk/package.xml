@@ -34,6 +34,7 @@
   <depend>nav2_waypoint_follower</depend>
   <depend>joy</depend>
   <depend>teleop_twist_joy</depend>
+  <depend>realsense2_camera</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

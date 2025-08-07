@@ -95,7 +95,7 @@ jobs:
             echo "Creating manifest for: $tag"
             docker manifest create $tag \
               --amend ${tag}-amd64 \
-              --amend ${tag}-arm64
+              --amend ${tag}-arm64 \
               --insecure
             docker manifest push $tag
           done

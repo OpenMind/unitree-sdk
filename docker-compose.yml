@@ -41,19 +41,21 @@ services:
         max-file: "3"
     restart: unless-stopped
 
-  ros2_intel435:
+  om1_sensor:
     build:
       context: .
     image: openmindagi/unitree_go2_sdk:latest
-    container_name: ros2_intel435
+    container_name: om1_sensor
     network_mode: host
     devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
       - /dev/bus/usb:/dev/bus/usb
     privileged: true
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
-    command: "ros2 launch realsense2_camera rs_launch.py"
+      - ROS_DOMAIN_ID=0
+    command: "ros2 launch go2_sdk sensor_launch.py"
     volumes:
       - /dev:/dev
       - /run/udev:/run/udev:ro

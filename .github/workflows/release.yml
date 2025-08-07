@@ -1,5 +1,4 @@
 name: Unitree Go2 ROS2 SDK Release
-
 on:
   push:
     branches: main
@@ -8,19 +7,18 @@ on:
 jobs:
   amd64:
     runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -32,7 +30,8 @@ jobs:
             type=ref,event=branch
             type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
+          flavor: |
+            suffix=-amd64
       - name: Build and push AMD64 image
         uses: docker/build-push-action@v4
         with:
@@ -40,7 +39,7 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64
-          tags: ${{ steps.meta.outputs.tags }}-amd64
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
   arm64:
@@ -48,16 +47,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -69,7 +65,8 @@ jobs:
             type=ref,event=branch
             type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
+          flavor: |
+            suffix=-arm64
       - name: Build and push ARM64 image
         uses: docker/build-push-action@v4
         with:
@@ -77,7 +74,7 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}-arm64
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
   create-manifest:
@@ -89,22 +86,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: openmindagi/unitree_go2_sdk
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=sha
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
       - name: Create and push multi-platform manifest
         run: |
-          for tag in $(echo '${{ steps.meta.outputs.tags }}' | tr '\n' ' '); do
+          # Get tags without suffix from amd64 job, then remove -amd64 suffix
+          tags=$(echo '${{ needs.amd64.outputs.tags }}' | sed 's/-amd64$//')
+
+          for tag in $tags; do
+            echo "Creating manifest for: $tag"
             docker manifest create $tag \
               --amend ${tag}-amd64 \
               --amend ${tag}-arm64

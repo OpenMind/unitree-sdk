@@ -5,55 +5,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  amd64:
+  build-amd64:
     runs-on: ubuntu-latest
     outputs:
-      tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+      metadata: ${{ steps.meta.outputs.json }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: openmindagi/unitree_go2_sdk
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=sha
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-          flavor: |
-            suffix=-amd64
-      - name: Build and push AMD64 image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          platforms: linux/amd64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
 
-  arm64:
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -65,37 +34,80 @@ jobs:
             type=ref,event=branch
             type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-          flavor: |
-            suffix=-arm64
-      - name: Build and push ARM64 image
+
+      - name: Build and push AMD64 image by digest
+        id: build
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ./Dockerfile
-          push: true
-          platforms: linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=openmindagi/unitree_go2_sdk,push-by-digest=true,name-canonical=true,push=true
+
+  build-arm64:
+    runs-on: ubuntu-22.04-arm  # Your ARM64 runner
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: openmindagi/unitree_go2_sdk
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push ARM64 image by digest
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=openmindagi/unitree_go2_sdk,push-by-digest=true,name-canonical=true,push=true
 
   create-manifest:
     runs-on: ubuntu-latest
-    needs: [amd64, arm64]
+    needs: [build-amd64, build-arm64]
     steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Create and push multi-platform manifest
-        run: |
-          # Get tags without suffix from amd64 job, then remove -amd64 suffix
-          tags=$(echo '${{ needs.amd64.outputs.tags }}' | sed 's/-amd64$//')
 
+      - name: Create manifest list and push
+        run: |
+          # Get the metadata from amd64 build to extract tags
+          tags=$(echo '${{ needs.build-amd64.outputs.metadata }}' | jq -r '.tags[]')
+
+          # Create manifest for each tag
           for tag in $tags; do
             echo "Creating manifest for: $tag"
-            docker manifest create $tag \
-              --amend ${tag}-amd64 \
-              --amend ${tag}-arm64 \
-              --insecure
-            docker manifest push $tag
+
+            docker buildx imagetools create \
+              --tag $tag \
+              openmindagi/unitree_go2_sdk@${{ needs.build-amd64.outputs.image-digest }} \
+              openmindagi/unitree_go2_sdk@${{ needs.build-arm64.outputs.image-digest }}
           done

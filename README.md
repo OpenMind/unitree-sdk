@@ -105,6 +105,19 @@ To start the navigation system with SLAM:
 ros2 launch go2_sdk nav2_launch.py map_yaml_file:=<path_to_your_map_yaml_file>
 ```
 
+### Launch the sensor system
+To start the sensor system (RPLiDAR and Unitree Go2 sensors):
+
+```bash
+docker-compose up om1_sensor -d --no-build
+```
+
+It will start the sensor system in a detached mode. You can check the logs with:
+
+```bash
+docker-compose logs -f om1_sensor
+```
+
 ### Control the Robot
 
 Once SLAM is running, you can control the robot using:

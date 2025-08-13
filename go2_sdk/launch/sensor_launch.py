@@ -76,12 +76,22 @@ def generate_launch_description():
             parameters=[{
                 'enable_color': True,
                 'enable_depth': True,
+                'enable_infra1': False,
+                'enable_infra2': False, 
                 'enable_gyro': False,
                 'enable_accel': False,
                 'unite_imu_method': 0,
+                'depth_module.depth_profile': '424x240x6'
             }],
             output='screen',
             respawn=True,
             respawn_delay=2.0
+        ),
+
+        Node(
+            package='go2_sdk',
+            executable='d435_obstacle_dector',
+            name='d435_obstacle_dector',
+            output='screen'
         ),
     ])

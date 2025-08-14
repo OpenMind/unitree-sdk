@@ -1,6 +1,5 @@
 import math
 
-import matplotlib.pyplot as plt
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
@@ -37,7 +36,11 @@ class D435ObstacleDector(Node):
             10,
         )
 
-        self.obstacle_pub = self.create_publisher(PointCloud, "/camera/realsense2_camera_node/depth/obstacle_point", 10)
+        self.obstacle_pub = self.create_publisher(
+            PointCloud, 
+            "/camera/realsense2_camera_node/depth/obstacle_point", 
+            10
+        )
 
         self.get_logger().info("Intel435ObstacleDector node started")
 
@@ -140,24 +143,6 @@ class D435ObstacleDector(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error processing depth image: {e}")
-
-    def plot_obstacles(self):
-        if len(self.obstacle) > 50:
-            x_coords = [obs["x"] for obs in self.obstacle]
-            y_coords = [obs["y"] for obs in self.obstacle]
-
-            plt.clf()
-            plt.scatter(x_coords, y_coords, c="red", alpha=0.6, s=10)
-            plt.scatter(0, 0, c="blue", s=50, marker="o")
-            plt.xlabel("X (forward) [m]")
-            plt.ylabel("Y (left) [m]")
-            plt.title(f"Obstacles Top View ({len(self.obstacle)} points)")
-            plt.grid(True, alpha=0.3)
-            plt.xlim(-0.1, 0.5)
-            plt.ylim(-0.1, 0.5)
-            plt.pause(0.001)
-            plt.show(block=False)
-
 
 def main(args=None):
     rclpy.init(args=args)

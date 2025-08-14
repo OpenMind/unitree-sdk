@@ -32,6 +32,7 @@ setup(
             'waypoint_manager = go2_sdk.waypoint_manager:main',
             'api = go2_sdk.api:main',
             'joint_state_publisher = go2_sdk.joint_state:main',
+            "d435_obstacle_dector = go2_sdk.d435_obstacle_dector:main"
         ],
     },
 )

@@ -19,7 +19,7 @@ class D435ObstacleDector(Node):
         self.cx = None
         self.cy = None
 
-        self.obstacle_threshold = 0.05  # 5cm above ground
+        self.obstacle_threshold = 0.10  # 10cm above ground
         self.obstacle = []
 
         self.depth_subscription = self.create_subscription(
@@ -37,8 +37,8 @@ class D435ObstacleDector(Node):
         )
 
         self.obstacle_pub = self.create_publisher(
-            PointCloud, 
-            "/camera/realsense2_camera_node/depth/obstacle_point", 
+            PointCloud,
+            "/camera/realsense2_camera_node/depth/obstacle_point",
             10
         )
 

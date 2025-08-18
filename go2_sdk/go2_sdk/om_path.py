@@ -4,10 +4,9 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Int32MultiArray
 from sensor_msgs.msg import LaserScan
 from sensor_msgs.msg import PointCloud
-
+from om_api.msg import Paths
 
 def create_straight_line_path_from_angle(angle_degrees, length=1.0, num_points=10):
     """Create a straight line path from origin at specified angle and length"""
@@ -29,9 +28,9 @@ paths = [
     create_straight_line_path_from_angle(angle, path_length) for angle in path_angles
 ]
 
-class OM1Path(Node):
+class OMPath(Node):
     def __init__(self):
-        super().__init__("om1_path")
+        super().__init__("om_path")
 
         self.half_width_robot = 0.20
         self.sensor_mounting_angle = 172.0
@@ -55,12 +54,12 @@ class OM1Path(Node):
         )
 
         self.paths_pub = self.create_publisher(
-            Int32MultiArray,
-            "/om1/paths",
+            Paths,
+            "/om/paths",
             10
         )
 
-        self.get_logger().info("OM1Path node started")
+        self.get_logger().info("OMPath node started")
 
     def scan_callback(self, msg: LaserScan):
         self.scan = msg
@@ -175,7 +174,12 @@ class OM1Path(Node):
 
         print(f"possible_paths: {possible_paths}")
 
-        self.paths_pub.publish(Int32MultiArray(data=possible_paths.tolist()))
+        paths_msg = Paths()
+        paths_msg.header.stamp = self.get_clock().now().to_msg()
+        paths_msg.header.frame_id = "laser"
+        paths_msg.paths = possible_paths.tolist()
+
+        self.paths_pub.publish(paths_msg)
 
     def obstacle_callback(self, msg: PointCloud):
         self.obstacle = msg
@@ -212,7 +216,7 @@ class OM1Path(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OM1Path()
+    node = OMPath()
 
     try:
         rclpy.spin(node)

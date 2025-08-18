@@ -59,7 +59,7 @@ class D435ObstacleDector(Node):
         Convert image coordinates to world coordinates
         """
         if self.fx is None or self.fy is None or self.cx is None or self.cy is None:
-            self.get_logger().warn("Camera intrinsics not available yet")
+            self.get_logger().debug("Camera intrinsics not available yet")
             return None, None, None
 
         depth_meters = depth_value / 1000.0

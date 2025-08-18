@@ -36,6 +36,8 @@ class OMPath(Node):
         self.sensor_mounting_angle = 172.0
         self.relevant_distance_min = 0.20
 
+        self.obstacle_threshold = 0.50  # 50 data points
+
         self.scan = None
         self.obstacle = None
 
@@ -116,7 +118,7 @@ class OMPath(Node):
             if keep:
                 complexes.append([x, y, angle, d_m])
 
-        if self.obstacle and len(self.obstacle.points) > 100:
+        if self.obstacle and len(self.obstacle.points) > self.obstacle_threshold:
             for point in self.obstacle.points:
                 x = point.x
                 y = point.y

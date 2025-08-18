@@ -92,6 +92,17 @@ def generate_launch_description():
             package='go2_sdk',
             executable='d435_obstacle_dector',
             name='d435_obstacle_dector',
-            output='screen'
+            output='screen',
+            respawn=True,
+            respawn_delay=2.0
         ),
+
+        Node(
+            package='go2_sdk',
+            executable='om_path',
+            name='om_path',
+            output='screen',
+            respawn=True,
+            respawn_delay=2.0
+        )
     ])

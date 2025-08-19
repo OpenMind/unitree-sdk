@@ -174,8 +174,6 @@ class OMPath(Node):
                     possible_paths = np.setdiff1d(possible_paths, path_to_remove)
                     break  # no need to keep checking this path - we know this path is bad
 
-        print(f"possible_paths: {possible_paths}")
-
         paths_msg = Paths()
         paths_msg.header.stamp = self.get_clock().now().to_msg()
         paths_msg.header.frame_id = "laser"

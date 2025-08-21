@@ -229,6 +229,18 @@ After installing the Zenoh ROS 2 bridge, you can run it with the following comma
 zenoh-bridge-ros2dds -c ./zenoh/zenoh_bridge_config.json5
 ```
 
+## Development Guidance
+
+This section provides guidance for developers working on the new OM backpack system.
+
+![backpack](./models/backpack.jpg)
+
+You can connect your Linux machine to one of the Ethernet ports of the OM backpack.
+
+Open the network settings and find the network interface that the robot is connected to. In IPv4 settings, change the IPv4 mode to manual, set the address to 192.168.123.100, and set the mask to 255.255.255.0. After completion, click apply and wait for the network to reconnect.
+
+Then you can subscribe to the topics published by the Orin AGX and the Unitree Go2 robot.
+
 
 ## Troubleshooting
 

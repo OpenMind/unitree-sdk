@@ -27,7 +27,7 @@ class WatchSensor(Node):
         except DockerException as e:
             self.get_logger().error(f"Failed to initialize Docker client: {str(e)}")
             raise
-
+            
         self.watchdog_thread = threading.Thread(target=self.watchdog_loop, daemon=True)
         self.watchdog_thread.start()
 
@@ -128,7 +128,7 @@ class WatchSensor(Node):
             except Exception as e:
                 self.get_logger().error(f"Watchdog error: {str(e)}")
                 time.sleep(5.0)
-
+                
     def __del__(self):
         """
         Cleanup Docker client

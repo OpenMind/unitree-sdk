@@ -80,6 +80,8 @@ services:
     container_name: watchdog
     network_mode: host
     privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - SENSOR_TIMEOUT_DURATION=30.0
     command: "python3 watchdog/watch_sensor.py"

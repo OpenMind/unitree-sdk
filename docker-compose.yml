@@ -72,3 +72,20 @@ services:
         max-size: "10m"
         max-file: "3"
     restart: unless-stopped
+
+  watchdog:
+    build:
+      context: .
+    image: openmindagi/unitree_go2_sdk:latest
+    container_name: watchdog
+    network_mode: host
+    privileged: true
+    environment:
+      - SENSOR_TIMEOUT_DURATION=30.0
+    command: "python3 watchdog/watch_sensor.py"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped

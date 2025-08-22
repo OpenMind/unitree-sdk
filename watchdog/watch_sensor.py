@@ -1,7 +1,8 @@
 import os
-import subprocess
 import threading
 import time
+import docker
+from docker.errors import DockerException, NotFound, APIError
 import rclpy
 from rclpy.node import Node
 
@@ -15,12 +16,17 @@ class WatchSensor(Node):
 
         self.last_scan_time = time.time()
         self.last_paths_time = time.time()
-        self.timeout_duration =  float(os.getenv('SENSOR_TIMEOUT_DURATION', '30.0'))
+        self.timeout_duration = float(os.getenv('SENSOR_TIMEOUT_DURATION', '30.0'))
 
-        self.compose_file = os.getenv('COMPOSE_FILE', 'docker-compose.yml')
-        self.compose_project_dir = os.getenv('COMPOSE_PROJECT_DIR', '.')
         self.sensor_service_name = os.getenv('SENSOR_SERVICE_NAME', 'om1_sensor')
         self.zenoh_service_name = os.getenv('ZENOH_SERVICE_NAME', 'zenoh_bridge')
+
+        try:
+            self.docker_client = docker.from_env()
+            self.get_logger().info("Docker client initialized successfully")
+        except DockerException as e:
+            self.get_logger().error(f"Failed to initialize Docker client: {str(e)}")
+            raise
 
         self.watchdog_thread = threading.Thread(target=self.watchdog_loop, daemon=True)
         self.watchdog_thread.start()
@@ -63,9 +69,37 @@ class WatchSensor(Node):
         self.last_scan_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         self.get_logger().debug("Received scan message")
 
+    def restart_container(self, service_name: str) -> bool:
+        """
+        Restart a container
+
+        Parameters
+        ----------
+        service_name : str
+            The name of the service/container to restart
+
+        Returns
+        -------
+        bool
+            True if restart was successful, False otherwise
+        """
+        try:
+            container = self.docker_client.containers.get(service_name)
+            self.get_logger().info(f"Restarting container: {container.name}")
+            container.restart(timeout=10)
+            self.get_logger().info(f"Successfully restarted container: {container.name}")
+            return True
+
+        except NotFound:
+            self.get_logger().error(f"Container '{service_name}' not found")
+            return False
+        except APIError as e:
+            self.get_logger().error(f"Error restarting {service_name}: {str(e)}")
+            return False
+
     def watchdog_loop(self):
         """
-        Monitor topics and restart container if needed
+        Monitor topics and restart containers if needed
         """
         while True:
             try:
@@ -80,8 +114,11 @@ class WatchSensor(Node):
                     if paths_timeout:
                         missing_topics.append("/om/paths")
 
-                    self.get_logger().warn(f"Topics {missing_topics} missing for {self.timeout_duration}s. Restarting container...")
-                    self.restart_container()
+                    self.get_logger().warn(f"Topics {missing_topics} missing for {self.timeout_duration}s. Restarting containers...")
+
+                    self.restart_container(self.sensor_service_name)
+                    time.sleep(1.0)
+                    self.restart_container(self.zenoh_service_name)
 
                     self.last_scan_time = time.time()
                     self.last_paths_time = time.time()
@@ -92,46 +129,15 @@ class WatchSensor(Node):
                 self.get_logger().error(f"Watchdog error: {str(e)}")
                 time.sleep(5.0)
 
-    def restart_container(self):
+    def __del__(self):
         """
-        Restart the om1_sensor docker container
+        Cleanup Docker client
         """
         try:
-            self.get_logger().info(f"Restarting services: {self.sensor_service_name} and {self.zenoh_service_name}")
-
-            original_cwd = os.getcwd()
-            os.chdir(self.compose_project_dir)
-
-            subprocess.run([
-                'docker-compose', '-f', self.compose_file,
-                'rm', '-f', '-s', self.sensor_service_name
-            ], check=True, capture_output=True, text=True)
-
-            subprocess.run([
-                'docker-compose', '-f', self.compose_file,
-                'up', '-d', '--force-recreate', self.sensor_service_name
-            ], check=True, capture_output=True, text=True)
-
-            self.get_logger().info(f"Service {self.sensor_service_name} restarted successfully")
-
-            subprocess.run([
-                'docker-compose', '-f', self.compose_file,
-                'restart', self.zenoh_service_name
-            ], check=True, capture_output=True, text=True)
-
-            self.get_logger().info(f"Service {self.zenoh_service_name} restarted successfully")
-
-            os.chdir(original_cwd)
-
-        except subprocess.CalledProcessError as e:
-            self.get_logger().error(f"Docker-compose error: {e.stderr}")
-        except Exception as e:
-            self.get_logger().error(f"Failed to restart service: {str(e)}")
-        finally:
-            try:
-                os.chdir(original_cwd)
-            except:
-                pass
+            if hasattr(self, 'docker_client'):
+                self.docker_client.close()
+        except:
+            pass
 
 def main(args=None):
     rclpy.init(args=args)

@@ -5,3 +5,4 @@ MarkupSafe==3.0.2
 click==8.2.1
 itsdangerous==2.2.0
 Jinja2==3.1.6
+docker==7.1.0

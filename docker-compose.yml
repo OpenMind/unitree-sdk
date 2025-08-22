@@ -55,7 +55,7 @@ services:
       - /dev/bus/usb:/dev/bus/usb
     privileged: true
     environment:
-      - DISPLAY=${DISPLAY}
+      - DISPLAY=${DISPLAY:-}
       - QT_X11_NO_MITSHM=1
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install

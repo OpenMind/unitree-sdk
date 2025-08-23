@@ -137,13 +137,6 @@ def generate_launch_description():
         ),
 
         Node(
-            package='go2_sdk',
-            executable='api',
-            name='go2_api_node',
-            output='screen',
-        ),
-
-        Node(
             package='joy',
             executable='joy_node',
             name='joy_node',

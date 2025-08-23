@@ -84,19 +84,19 @@ def generate_launch_description():
             output='screen'
         ),
 
-        Node(
-            package='rplidar_ros',
-            executable='rplidar_node',
-            name='rplidar_node',
-            parameters=[{
-                'channel_type': channel_type,
-                'serial_port': serial_port,
-                'serial_baudrate': serial_baudrate,
-                'frame_id': frame_id,
-                'inverted': inverted,
-                'angle_compensate': angle_compensate
-            }],
-            output='screen'),
+        # Node(
+        #     package='rplidar_ros',
+        #     executable='rplidar_node',
+        #     name='rplidar_node',
+        #     parameters=[{
+        #         'channel_type': channel_type,
+        #         'serial_port': serial_port,
+        #         'serial_baudrate': serial_baudrate,
+        #         'frame_id': frame_id,
+        #         'inverted': inverted,
+        #         'angle_compensate': angle_compensate
+        #     }],
+        #     output='screen'),
 
         Node(
             package='tf2_ros',
@@ -137,8 +137,8 @@ def generate_launch_description():
 
         Node(
             package='go2_sdk',
-            executable='api',
-            name='go2_api_node',
+            executable='go2_nav2_api',
+            name='go2_nav2_api_node',
             output='screen',
         ),
 

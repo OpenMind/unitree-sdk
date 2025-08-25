@@ -6,7 +6,8 @@ import subprocess
 from rclpy.node import Node
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from typing import List, Dict, Optional
+from typing import Dict, Optional
+from om_api.msg import MapStorage
 
 class ProcessManager:
     """
@@ -45,7 +46,8 @@ class ProcessManager:
             ]
             if map_yaml:
                 cmd.append(f'map_yaml_file:={map_yaml}')
-            self.process = subprocess.Popen(cmd)
+            # Start process in its own process group to prevent signal propagation
+            self.process = subprocess.Popen(cmd, preexec_fn=os.setsid)
             return True
         return False
 
@@ -61,15 +63,28 @@ class ProcessManager:
         """
         if self.process and self.process.poll() is None:
             try:
+                # First try to terminate the process group gracefully
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
                 try:
                     self.process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
+                    # If it doesn't terminate gracefully, force kill
                     os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
                     self.process.wait()
                 return True
-            except (ProcessLookupError, OSError):
-                return True
+            except (ProcessLookupError, OSError) as e:
+                # If process group doesn't exist, try terminating just the process
+                try:
+                    self.process.terminate()
+                    try:
+                        self.process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        self.process.kill()
+                        self.process.wait()
+                    return True
+                except (ProcessLookupError, OSError):
+                    # Process already terminated
+                    return True
         return False
 
 class OrchestratorAPI(Node):
@@ -82,6 +97,8 @@ class OrchestratorAPI(Node):
 
         self.slam_manager = ProcessManager()
         self.nav2_manager = ProcessManager()
+
+        self.map_saver_publisher = self.create_publisher(MapStorage, '/om/map_storage', 10)
 
         self.maps_directory = os.path.abspath("./maps")
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
@@ -188,6 +205,18 @@ class OrchestratorAPI(Node):
 
             result = self.save_map(map_name, map_directory)
 
+            files_created = result.get("files_created", [])
+            base_path = result.get("base_path", "")
+
+            map_storage_msg = MapStorage()
+            map_storage_msg.header.stamp = self.get_clock().now().to_msg()
+            map_storage_msg.header.frame_id = "om_api"
+            map_storage_msg.map_name = map_name
+            map_storage_msg.files_created = files_created
+            map_storage_msg.base_path = base_path
+
+            self.map_saver_publisher.publish(map_storage_msg)
+
             if result["status"] == "success":
                 return jsonify(result), 200
             else:
@@ -277,9 +306,9 @@ class OrchestratorAPI(Node):
             ]
 
             self.get_logger().info("Saving pose graph...")
-            result1 = subprocess.run(cmd_posegraph, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd_posegraph, capture_output=True, text=True, timeout=30)
 
-            if "result=0" in result1.stdout.lower():
+            if "result=0" in result.stdout.lower():
                 posegraph_file = f"{map_path}.posegraph"
                 data_file = f"{map_path}.data"
 

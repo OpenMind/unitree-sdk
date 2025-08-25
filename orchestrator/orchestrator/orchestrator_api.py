@@ -46,7 +46,6 @@ class ProcessManager:
             ]
             if map_yaml:
                 cmd.append(f'map_yaml_file:={map_yaml}')
-            # Start process in its own process group to prevent signal propagation
             self.process = subprocess.Popen(cmd, preexec_fn=os.setsid)
             return True
         return False
@@ -63,17 +62,14 @@ class ProcessManager:
         """
         if self.process and self.process.poll() is None:
             try:
-                # First try to terminate the process group gracefully
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
                 try:
                     self.process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    # If it doesn't terminate gracefully, force kill
                     os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
                     self.process.wait()
                 return True
             except (ProcessLookupError, OSError) as e:
-                # If process group doesn't exist, try terminating just the process
                 try:
                     self.process.terminate()
                     try:
@@ -83,7 +79,6 @@ class ProcessManager:
                         self.process.wait()
                     return True
                 except (ProcessLookupError, OSError):
-                    # Process already terminated
                     return True
         return False
 

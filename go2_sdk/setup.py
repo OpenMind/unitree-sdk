@@ -6,7 +6,7 @@ package_name = 'go2_sdk'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='0.1.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -24,13 +24,12 @@ setup(
     maintainer_email='hello@openmind.org',
     description='Unitree Go2 robot SLAM package with RPLidar',
     license='MIT',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'pose_to_tf = go2_sdk.pose_to_tf:main',
             'cmd_vel_to_go2 = go2_sdk.go2_movement:main',
             'waypoint_manager = go2_sdk.waypoint_manager:main',
-            'api = go2_sdk.api:main',
+            'go2_nav2_api = go2_sdk.go2_nav2_api:main',
             'joint_state_publisher = go2_sdk.joint_state:main',
             "d435_obstacle_dector = go2_sdk.d435_obstacle_dector:main",
             "om_path = go2_sdk.om_path:main",

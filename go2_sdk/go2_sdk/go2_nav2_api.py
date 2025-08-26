@@ -25,7 +25,7 @@ class Go2APINode(Node):
     A ROS2 node that provides a REST API for interacting with the Unitree Go2 robot.
     """
     def __init__(self):
-        super().__init__("go2_api_node")
+        super().__init__("go2_nav2_api_node")
 
         self.pose_subscription = self.create_subscription(
             PoseStamped,
@@ -84,7 +84,7 @@ class Go2APINode(Node):
         """
         Run the Flask application in a separate thread.
         """
-        self.app.run(host='0.0.0.0', port=5000, use_reloader=False)
+        self.app.run(host='0.0.0.0', port=5001, use_reloader=False)
 
     def register_routes(self):
         """

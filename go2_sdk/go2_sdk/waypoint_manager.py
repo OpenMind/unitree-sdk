@@ -3,8 +3,6 @@ from rclpy.node import Node
 import tf2_ros
 from tf2_ros import TransformException
 from geometry_msgs.msg import PoseStamped
-import math
-
 
 class WaypointManager(Node):
     def __init__(self):

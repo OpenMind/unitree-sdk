@@ -95,7 +95,7 @@ services:
   orchestrator:
     build:
       context: .
-    image: openmindagi/unitree_go2_sdk:sha-5b35cdd
+    image: openmindagi/unitree_go2_sdk:latest
     container_name: orchestrator
     network_mode: host
     privileged: true

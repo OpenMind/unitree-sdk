@@ -2,13 +2,17 @@ import os
 import requests
 import rclpy
 from rclpy.node import Node
+from typing import Optional
 from om_api.msg import MapStorage
 from geometry_msgs.msg import PoseStamped
-import websocket
+from nav_msgs.msg import OccupancyGrid
 import json
+
+from .ws_client import WebSocketClient
 
 map_api_url = "https://api.openmind.org/api/core/maps/upload"
 pose_ws_url = "wss://api.openmind.org/api/core/teleops/pose"
+map_ws_url = "wss://api.openmind.org/api/core/teleops/maps"
 
 class OrchestratorCloud(Node):
     """
@@ -25,36 +29,36 @@ class OrchestratorCloud(Node):
             MapStorage,
             '/om/map_storage',
             self.upload_map,
-            10
+            10,
         )
 
         self.pose_sub = self.create_subscription(
             PoseStamped,
             '/om/pose',
             self.pose_callback,
-            10
+            10,
         )
 
-        self.ws = None
-        self.connect_websocket()
+        self.map_sub = self.create_subscription(
+            OccupancyGrid,
+            '/map',
+            self.map_callback,
+            10,
+        )
+
+        self.pose_ws_url = f"{pose_ws_url}?api_key={self.api_key}" if self.api_key else None
+        self.map_ws_url = f"{map_ws_url}?api_key={self.api_key}" if self.api_key else None
+
+        self.pose_ws = WebSocketClient(self.pose_ws_url, self.get_logger()) if self.pose_ws_url else None
+        self.map_ws = WebSocketClient(self.map_ws_url, self.get_logger()) if self.map_ws_url else None
+
+        if self.pose_ws:
+            self.pose_ws.start()
+
+        if self.map_ws:
+            self.map_ws.start()
 
         self.get_logger().info("Orchestrator Cloud Node Initialized")
-
-    def connect_websocket(self):
-        """
-        Connect to the WebSocket server for sending pose data.
-        """
-        if not self.api_key:
-            self.get_logger().error("Cannot connect to WebSocket: OPENMIND_API_KEY not set.")
-            return
-
-        try:
-            ws_url = f"{pose_ws_url}?api_key={self.api_key}"
-            self.ws = websocket.create_connection(ws_url)
-            self.get_logger().info("WebSocket connected")
-        except Exception as e:
-            self.get_logger().error(f"WebSocket connection failed: {e}")
-            self.ws = None
 
     def upload_map(self, map_data: MapStorage):
         """
@@ -97,7 +101,6 @@ class OrchestratorCloud(Node):
                 'Authorization': f'Bearer {self.api_key}'
             }
 
-            self.get_logger().info(f"Uploading map '{map_name}' to {map_api_url}... with headers {headers}")
             try:
                 response = requests.put(map_api_url, files=files, headers=headers, data={'map_name': map_name})
                 response.raise_for_status()
@@ -142,17 +145,61 @@ class OrchestratorCloud(Node):
             }
         }
 
-        if self.ws is None:
-            self.get_logger().info("WebSocket not connected, attempting to reconnect...")
-            self.connect_websocket()
-
-        if self.ws:
+        if self.pose_ws and self.pose_ws.connected:
             try:
-                self.ws.send(json.dumps(pose_data))
-                self.get_logger().info(f"Pose sent: {pose_data}")
+                self.pose_ws.send_message(json.dumps(pose_data))
+                self.get_logger().info("Pose data sent.")
             except Exception as e:
                 self.get_logger().error(f"Failed to send pose data: {e}")
-                self.ws = None
+
+    def map_callback(self, map_msg: OccupancyGrid):
+        """
+        Callback function for OccupancyGrid messages.
+
+        Parameters:
+        -----------
+        map_msg : nav_msgs.msg.OccupancyGrid
+            The incoming OccupancyGrid message containing the map data.
+        """
+        if not self.api_key:
+            self.get_logger().error("Cannot send map: OPENMIND_API_KEY not set.")
+            return
+
+        map_data = {
+            "header": {
+                "stamp": {
+                    "sec": map_msg.header.stamp.sec,
+                    "nanosec": map_msg.header.stamp.nanosec
+                },
+                "frame_id": map_msg.header.frame_id
+            },
+            "info": {
+                "resolution": map_msg.info.resolution,
+                "width": map_msg.info.width,
+                "height": map_msg.info.height,
+                "origin": {
+                    "position": {
+                        "x": map_msg.info.origin.position.x,
+                        "y": map_msg.info.origin.position.y,
+                        "z": map_msg.info.origin.position.z
+                    },
+                    "orientation": {
+                        "x": map_msg.info.origin.orientation.x,
+                        "y": map_msg.info.origin.orientation.y,
+                        "z": map_msg.info.origin.orientation.z,
+                        "w": map_msg.info.origin.orientation.w
+                    }
+                }
+            },
+            "data": list(map_msg.data)
+        }
+
+        if self.map_ws and self.map_ws.connected:
+            try:
+                self.map_ws.send_message(json.dumps(map_data))
+                self.get_logger().info("Map data sent.")
+            except Exception as e:
+                self.get_logger().error(f"Failed to send map data: {e}")
 
 def main(args=None):
     """
@@ -168,6 +215,12 @@ def main(args=None):
         pass
     finally:
         orchestrator_cloud.destroy_node()
+
+        if orchestrator_cloud.pose_ws:
+            orchestrator_cloud.pose_ws.stop()
+        if orchestrator_cloud.map_ws:
+            orchestrator_cloud.map_ws.stop()
+
         rclpy.shutdown()
 
 if __name__ == '__main__':

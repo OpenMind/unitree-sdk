@@ -105,7 +105,7 @@ services:
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
-      - OPENMIND_API_KEY=${OPENMIND_API_KEY:-}
+      - OM_API_KEY=${OM_API_KEY:-}
     command: "ros2 launch orchestrator orchestrator_launch.py"
     volumes:
       - /dev:/dev

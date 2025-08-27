@@ -21,9 +21,9 @@ class OrchestratorCloud(Node):
     def __init__(self):
         super().__init__('orchestrator_cloud')
 
-        self.api_key = os.getenv('OPENMIND_API_KEY')
+        self.api_key = os.getenv('OM_API_KEY')
         if not self.api_key:
-            self.get_logger().error("OPENMIND_API_KEY environment variable not set!")
+            self.get_logger().error("OM_API_KEY environment variable not set!")
 
         self.map_saver_sub = self.create_subscription(
             MapStorage,
@@ -78,7 +78,7 @@ class OrchestratorCloud(Node):
         self.get_logger().info(f"Base path: {base_path}")
 
         if not self.api_key:
-            self.get_logger().error("Cannot upload map: OPENMIND_API_KEY not set.")
+            self.get_logger().error("Cannot upload map: OM_API_KEY not set.")
             return
 
         if "yaml" and "pgm" not in files_created:
@@ -127,7 +127,7 @@ class OrchestratorCloud(Node):
         orientation_w = pose.pose.orientation.w
 
         if not self.api_key:
-            self.get_logger().error("Cannot send pose: OPENMIND_API_KEY not set.")
+            self.get_logger().error("Cannot send pose: OM_API_KEY not set.")
             return
 
         pose_data = {
@@ -162,7 +162,7 @@ class OrchestratorCloud(Node):
             The incoming OccupancyGrid message containing the map data.
         """
         if not self.api_key:
-            self.get_logger().error("Cannot send map: OPENMIND_API_KEY not set.")
+            self.get_logger().error("Cannot send map: OM_API_KEY not set.")
             return
 
         map_data = {

@@ -4,6 +4,7 @@ import time
 import docker
 from docker.errors import DockerException, NotFound, APIError
 import rclpy
+import zenoh
 from rclpy.node import Node
 
 from sensor_msgs.msg import LaserScan
@@ -16,6 +17,7 @@ class WatchSensor(Node):
 
         self.last_scan_time = time.time()
         self.last_paths_time = time.time()
+        self.last_zenoh_time = time.time()
         self.timeout_duration = float(os.getenv('SENSOR_TIMEOUT_DURATION', '30.0'))
 
         self.sensor_service_name = os.getenv('SENSOR_SERVICE_NAME', 'om1_sensor')
@@ -27,25 +29,28 @@ class WatchSensor(Node):
         except DockerException as e:
             self.get_logger().error(f"Failed to initialize Docker client: {str(e)}")
             raise
-            
+
         self.watchdog_thread = threading.Thread(target=self.watchdog_loop, daemon=True)
         self.watchdog_thread.start()
 
         self.paths_subscription = self.create_subscription(
             Paths,
             '/om/paths',
-            self.paths_callback,
+            self.ros2_paths_callback,
             10
         )
 
         self.scan_subscription = self.create_subscription(
             LaserScan,
             "/scan",
-            self.scan_callback,
+            self.ros2_scan_callback,
             10,
         )
 
-    def paths_callback(self, msg: Paths):
+        self.zenoh_session = zenoh.open(zenoh.Config())
+        self.zenoh_session.declare_subscriber("om/paths", self.zenoh_paths_callback)
+
+    def ros2_paths_callback(self, msg: Paths):
         """
         Callback for /om/paths topic
 
@@ -57,7 +62,7 @@ class WatchSensor(Node):
         self.last_paths_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         self.get_logger().debug("Received paths message")
 
-    def scan_callback(self, msg: LaserScan):
+    def ros2_scan_callback(self, msg: LaserScan):
         """
         Callback for /scan topic
 
@@ -68,6 +73,18 @@ class WatchSensor(Node):
         """
         self.last_scan_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         self.get_logger().debug("Received scan message")
+
+    def zenoh_paths_callback(self, sample: zenoh.Sample):
+        """
+        Callback for /om/paths topic via Zenoh
+
+        Parameters
+        ----------
+        sample : zenoh.Sample
+            The received Zenoh sample
+        """
+        self.last_zenoh_time = time.time()
+        self.get_logger().debug("Received paths message via Zenoh")
 
     def restart_container(self, service_name: str) -> bool:
         """
@@ -106,6 +123,7 @@ class WatchSensor(Node):
                 current_time = time.time()
                 scan_timeout = (current_time - self.last_scan_time) > self.timeout_duration
                 paths_timeout = (current_time - self.last_paths_time) > self.timeout_duration
+                zenoh_timeout = (current_time - self.last_zenoh_time) > self.timeout_duration
 
                 if scan_timeout or paths_timeout:
                     missing_topics = []
@@ -118,17 +136,21 @@ class WatchSensor(Node):
 
                     self.restart_container(self.sensor_service_name)
                     time.sleep(1.0)
-                    self.restart_container(self.zenoh_service_name)
 
                     self.last_scan_time = time.time()
                     self.last_paths_time = time.time()
+
+                if zenoh_timeout:
+                    self.get_logger().warn(f"Zenoh paths missing for {self.timeout_duration}s. Restarting Zenoh container...")
+                    self.restart_container(self.zenoh_service_name)
+                    self.last_zenoh_time = time.time()
 
                 time.sleep(1.0)
 
             except Exception as e:
                 self.get_logger().error(f"Watchdog error: {str(e)}")
                 time.sleep(5.0)
-                
+
     def __del__(self):
         """
         Cleanup Docker client

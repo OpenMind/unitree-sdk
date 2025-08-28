@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
-from unitree_api.msg import Request, Response, RequestHeader, RequestIdentity
+from unitree_api.msg import Request, RequestHeader, RequestIdentity
 
 class Go2SportAction(Node):
     """
@@ -10,11 +10,10 @@ class Go2SportAction(Node):
     def __init__(self):
         super().__init__("go2_sport_action_node")
 
-        self.SPORT_API_ID_BALANCESTAND = 1002
-        self.SPORT_API_ID_STANDUP = 1004
+        self.SPORT_API_ID_RECOVERYSTAND = 1006
         self.SPORT_API_ID_STANDDOWN = 1005
 
-        self.joy_subscriber = self.create_subscription(
+        self.joy_subscription = self.create_subscription(
             Joy,
             "/joy",
             self.joy_callback,
@@ -44,10 +43,8 @@ class Go2SportAction(Node):
             return
 
         if msg.buttons[0] == 1:
-            self.send_sport_command(self.SPORT_API_ID_STANDUP)
-            self.get_logger().info("Sent Stand Up command")
-            self.send_sport_command(self.SPORT_API_ID_BALANCESTAND)
-            self.get_logger().info("Sent Balance Stand command")
+            self.send_sport_command(self.SPORT_API_ID_RECOVERYSTAND)
+            self.get_logger().info("Sent Recovery Stand command")
 
         elif msg.buttons[1] == 1:
             self.send_sport_command(self.SPORT_API_ID_STANDDOWN)

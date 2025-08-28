@@ -26,4 +26,22 @@ def generate_launch_description():
             name='joy_node',
             output='screen'
         ),
+
+        # RB is the enable button
+        # The left joystick controls linear movement
+        # The right joystick controls angular movement
+        Node(
+            package='teleop_twist_joy',
+            executable='teleop_node',
+            name='teleop_twist_joy_node',
+            output='screen',
+            parameters=[{
+                'axis_linear.x': 1,
+                'axis_linear.y': 0,
+                'axis_angular.z': 3,
+                'enable_button': 7,
+                'scale_linear.x': 0.5,
+                'scale_angular.z': 1.0
+            }]
+        ),
     ])

@@ -31,8 +31,9 @@ setup(
             'waypoint_manager = go2_sdk.waypoint_manager:main',
             'go2_nav2_api = go2_sdk.go2_nav2_api:main',
             'joint_state_publisher = go2_sdk.joint_state:main',
-            "d435_obstacle_dector = go2_sdk.d435_obstacle_dector:main",
-            "om_path = go2_sdk.om_path:main",
+            'd435_obstacle_dector = go2_sdk.d435_obstacle_dector:main',
+            'om_path = go2_sdk.om_path:main',
+            'go2_sport_action = go2_sdk.go2_sport_action:main',
         ],
     },
 )

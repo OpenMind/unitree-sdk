@@ -130,6 +130,13 @@ def generate_launch_description():
 
         Node(
             package='go2_sdk',
+            executable='go2_sport_action',
+            name='go2_sport_action',
+            output='screen',
+        ),
+
+        Node(
+            package='go2_sdk',
             executable='waypoint_manager',
             name='waypoint_manager',
             output='screen',

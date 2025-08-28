@@ -90,6 +90,7 @@ class OrchestratorAPI(Node):
     def __init__(self):
         super().__init__('orchestrator_api')
 
+        self.base_control_manager = ProcessManager()
         self.slam_manager = ProcessManager()
         self.nav2_manager = ProcessManager()
 
@@ -119,6 +120,32 @@ class OrchestratorAPI(Node):
         Register the API routes for the Flask application.
         """
 
+        @self.app.route('/start/base_control', methods=['POST'])
+        def start_base_control():
+            """
+            Start base control process.
+            """
+            if self.is_slam_running() or self.is_nav2_running():
+                return jsonify({"status": "error", "message": "Cannot start base control while SLAM or Nav2 is running"}), 400
+
+            data = request.json if request.json else {}
+            launch_file = data.get('launch_file', 'base_control_launch.py')
+
+            if self.base_control_manager.start(launch_file):
+                return jsonify({"status": "success", "message": "Base control started"}), 200
+            else:
+                return jsonify({"status": "error", "message": "Base control is already running"}), 400
+
+        @self.app.route('/stop/base_control', methods=['POST'])
+        def stop_base_control():
+            """
+            Stop base control process.
+            """
+            if self.base_control_manager.stop():
+                return jsonify({"status": "success", "message": "Base control stopped"}), 200
+            else:
+                return jsonify({"status": "error", "message": "Base control is not running"}), 400
+
         @self.app.route('/start/slam', methods=['POST'])
         def start_slam():
             """
@@ -131,6 +158,7 @@ class OrchestratorAPI(Node):
             launch_file = data.get('launch_file', 'slam_launch.py')
             map_yaml = data.get('map_yaml', None)
             if self.slam_manager.start(launch_file, map_yaml):
+                self.manage_base_control()
                 return jsonify({"status": "success", "message": "SLAM started"}), 200
             else:
                 return jsonify({"status": "error", "message": "SLAM is already running"}), 400
@@ -141,6 +169,7 @@ class OrchestratorAPI(Node):
             Stop SLAM process.
             """
             if self.slam_manager.stop():
+                self.manage_base_control()
                 return jsonify({"status": "success", "message": "SLAM stopped"}), 200
             else:
                 return jsonify({"status": "success", "message": "SLAM is not running"}), 400
@@ -157,6 +186,7 @@ class OrchestratorAPI(Node):
             launch_file = data.get('launch_file', 'nav2_launch.py')
             map_yaml = data.get('map_yaml', None)
             if self.nav2_manager.start(launch_file, map_yaml):
+                self.manage_base_control()
                 return jsonify({"status": "success", "message": "Nav2 started"}), 200
             else:
                 return jsonify({"status": "error", "message": "Nav2 is already running"}), 400
@@ -167,6 +197,7 @@ class OrchestratorAPI(Node):
             Stop Nav2 process.
             """
             if self.nav2_manager.stop():
+                self.manage_base_control()
                 return jsonify({"status": "success", "message": "Nav2 stopped"}), 200
             else:
                 return jsonify({"status": "error", "message": "Nav2 is not running"}), 400
@@ -178,7 +209,8 @@ class OrchestratorAPI(Node):
             """
             slam_status = "running" if self.slam_manager.process and self.slam_manager.process.poll() is None else "stopped"
             nav2_status = "running" if self.nav2_manager.process and self.nav2_manager.process.poll() is None else "stopped"
-            return jsonify({"slam_status": slam_status, "nav2_status": nav2_status}), 200
+            base_control_status = "running" if self.base_control_manager.process and self.base_control_manager.process.poll() is None else "stopped"
+            return jsonify({"slam_status": slam_status, "nav2_status": nav2_status, "base_control_status": base_control_status}), 200
 
         @self.app.route('/maps/save', methods=['POST'])
         def save_map():
@@ -370,6 +402,41 @@ class OrchestratorAPI(Node):
                 "errors": errors
             }
 
+    def is_slam_running(self) -> bool:
+        """
+        Check if SLAM is currently running.
+        """
+        return self.slam_manager.process and self.slam_manager.process.poll() is None
+
+    def is_nav2_running(self) -> bool:
+        """
+        Check if Nav2 is currently running.
+        """
+        return self.nav2_manager.process and self.nav2_manager.process.poll() is None
+
+    def is_base_control_running(self) -> bool:
+        """
+        Check if base control is currently running.
+        """
+        return self.base_control_manager.process and self.base_control_manager.process.poll() is None
+
+    def should_start_base_control(self) -> bool:
+        """
+        Check if base control should be started (when neither SLAM nor Nav2 is running).
+        """
+        return not self.is_slam_running() and not self.is_nav2_running()
+
+    def manage_base_control(self):
+        """
+        Start base control if conditions are met, stop it otherwise.
+        """
+        if self.should_start_base_control() and not self.is_base_control_running():
+            self.base_control_manager.start('base_control_launch.py')
+            self.get_logger().info("Base control started automatically")
+        elif not self.should_start_base_control() and self.is_base_control_running():
+            self.base_control_manager.stop()
+            self.get_logger().info("Base control stopped automatically")
+
 def main(args=None):
     """
     Main function to initialize the ROS2 node and spin it.
@@ -379,10 +446,12 @@ def main(args=None):
     orchestrator_api = OrchestratorAPI()
 
     try:
+        orchestrator_api.manage_base_control()
         rclpy.spin(orchestrator_api)
     except KeyboardInterrupt:
         pass
     finally:
+        orchestrator_api.base_control_manager.stop()
         orchestrator_api.slam_manager.stop()
         orchestrator_api.nav2_manager.stop()
         orchestrator_api.destroy_node()

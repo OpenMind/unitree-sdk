@@ -12,7 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/go2_sdk']),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/slam_launch.py', 'launch/nav2_launch.py', 'launch/sensor_launch.py']),
+        ('share/' + package_name + '/launch', ['launch/slam_launch.py', 'launch/nav2_launch.py', 'launch/sensor_launch.py', 'launch/base_control_launch.py']),
         ('share/' + package_name + '/config', ['config/slam.yaml', 'config/rviz.rviz', 'config/nav2_params.yaml']),
         ('share/' + package_name + '/urdf', ['urdf/go2.urdf']),
         (os.path.join('share', package_name, 'dae'), glob(os.path.join('dae', '*'))),

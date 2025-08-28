@@ -74,14 +74,14 @@ def generate_launch_description():
             executable='realsense2_camera_node',
             name='realsense2_camera_node',
             parameters=[{
-                'enable_color': True,
+                'enable_color': False,
                 'enable_depth': True,
                 'enable_infra1': False,
-                'enable_infra2': False, 
+                'enable_infra2': False,
                 'enable_gyro': False,
                 'enable_accel': False,
                 'unite_imu_method': 0,
-                'depth_module.depth_profile': '424x240x6'
+                'depth_module.depth_profile': '424x240x15'
             }],
             output='screen',
             respawn=True,

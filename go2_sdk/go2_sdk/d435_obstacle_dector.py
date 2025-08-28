@@ -54,84 +54,83 @@ class D435ObstacleDector(Node):
         except Exception as e:
             self.get_logger().error(f"Error processing depth info: {e}")
 
-    def image_to_world(self, u, v, depth_value, camera_height=0.45, tilt_angle=55):
+    def image_to_world_vectorized(self, depth_image, camera_height=0.45, tilt_angle=55):
         """
-        Convert image coordinates to world coordinates
+        Vectorized conversion from image coordinates to world coordinates
         """
         if self.fx is None or self.fy is None or self.cx is None or self.cy is None:
             self.get_logger().debug("Camera intrinsics not available yet")
-            return None, None, None
+            return []
 
-        depth_meters = depth_value / 1000.0
+        rows, cols = np.mgrid[0:depth_image.shape[0]:10, 0:depth_image.shape[1]:10]
 
-        # Image to camera coordinates
-        cam_x = (u - self.cx) * depth_meters / self.fx
-        cam_y = (v - self.cy) * depth_meters / self.fy
-        cam_z = depth_meters
+        depth_values = depth_image[rows, cols]
 
-        point_camera = np.array([cam_x, cam_y, cam_z])
+        valid_mask = depth_values > 0
+
+        if not np.any(valid_mask):
+            return []
+
+        rows_valid = rows[valid_mask]
+        cols_valid = cols[valid_mask]
+        depth_valid = depth_values[valid_mask] / 1000.0  # Convert to meters
+
+        cam_x = (cols_valid - self.cx) * depth_valid / self.fx
+        cam_y = (rows_valid - self.cy) * depth_valid / self.fy
+        cam_z = depth_valid
+
+        points_camera = np.vstack([cam_x, cam_y, cam_z])
+
         theta = np.radians(tilt_angle)
+        R_tilt = np.array([
+            [1, 0, 0],
+            [0, np.cos(theta), np.sin(theta)],
+            [0, -np.sin(theta), np.cos(theta)],
+        ])
 
-        R_tilt = np.array(
-            [
-                [1, 0, 0],
-                [0, np.cos(theta), np.sin(theta)],
-                [0, -np.sin(theta), np.cos(theta)],
-            ]
-        )
-
-        R_align = np.array(
-            [
-                [0, 0, 1],  # Camera Z (forward) -> World X (forward)
-                [-1, 0, 0],  # Camera X (right) -> World Y (left)
-                [0, -1, 0],  # Camera Y (down) -> World Z (up)
-            ]
-        )
+        R_align = np.array([
+            [0, 0, 1],   # Camera Z (forward) -> World X (forward)
+            [-1, 0, 0],  # Camera X (right) -> World Y (left)
+            [0, -1, 0],  # Camera Y (down) -> World Z (up)
+        ])
 
         R_combined = R_align @ R_tilt
-        point_world = R_combined @ point_camera
 
-        camera_position_world = np.array([0, 0, camera_height])
-        point_world = point_world + camera_position_world
+        points_world = R_combined @ points_camera
 
-        world_x = point_world[0]
-        world_y = point_world[1]
-        world_z = point_world[2]
+        camera_position_world = np.array([[0], [0], [camera_height]])
+        points_world = points_world + camera_position_world
 
-        return world_x, world_y, world_z
+        world_x = points_world[0]
+        world_y = points_world[1]
+        world_z = points_world[2]
 
-    def calculate_angle_and_distance(self, world_x, world_y):
-        distance = math.sqrt(world_x**2 + world_y**2)
+        obstacle_mask = world_z > self.obstacle_threshold
 
-        angle_rad = math.atan2(world_y, world_x)
-        angle_degrees = math.degrees(angle_rad)
+        if not np.any(obstacle_mask):
+            return []
 
-        return angle_degrees, distance
+        obstacles = []
+        world_x_filtered = world_x[obstacle_mask]
+        world_y_filtered = world_y[obstacle_mask]
+        world_z_filtered = world_z[obstacle_mask]
+
+        for i in range(len(world_x_filtered)):
+            obstacles.append(Point32(
+                x=float(-world_y_filtered[i]),
+                y=float(world_x_filtered[i]),
+                z=float(world_z_filtered[i])
+            ))
+
+        return obstacles
 
     def depth_callback(self, msg):
         try:
             depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
 
-            obstacle = []
-
-            for row in range(0, depth_image.shape[0], 10):
-                for col in range(0, depth_image.shape[1], 10):
-                    depth_value = depth_image[row, col]
-                    if depth_value > 0:
-                        world_x, world_y, world_z = self.image_to_world(
-                            col, row, depth_value, camera_height=0.45, tilt_angle=55
-                        )
-
-                        if world_x is not None and world_z > self.obstacle_threshold:
-                            # angle_degrees, distance = self.calculate_angle_and_distance(
-                            #     world_x, world_y
-                            # )
-                            # Change to the robot coordinate system
-                            obstacle.append(Point32(
-                                x=-world_y,
-                                y=world_x,
-                                z=world_z
-                            ))
+            obstacle = self.image_to_world_vectorized(
+                depth_image, camera_height=0.45, tilt_angle=55
+            )
 
             self.obstacle = obstacle
             self.get_logger().debug(f"Detected {len(self.obstacle)} obstacles")

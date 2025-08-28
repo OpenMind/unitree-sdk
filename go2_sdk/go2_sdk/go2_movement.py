@@ -12,9 +12,9 @@ class CmdVelToSportNode(Node):
     def __init__(self):
         super().__init__("cmd_vel_to_sport_node")
 
-        self.ROBOT_SPORT_API_ID_MOVE = 1008
-        self.ROBOT_SPORT_API_ID_BALANCESTAND = 1002
-        self.ROBOT_SPORT_API_ID_STOPMOVE = 1003
+        self.SPORT_API_ID_MOVE = 1008
+        self.SPORT_API_ID_BALANCESTAND = 1002
+        self.SPORT_API_ID_STOPMOVE = 1003
 
         self.cmd_vel_subscriber = self.create_subscription(
             Twist,
@@ -63,7 +63,7 @@ class CmdVelToSportNode(Node):
 
         request_msg.header = RequestHeader()
         request_msg.header.identity = RequestIdentity()
-        request_msg.header.identity.api_id = self.ROBOT_SPORT_API_ID_MOVE
+        request_msg.header.identity.api_id = self.SPORT_API_ID_MOVE
 
         move_params = {
             "x": float(linear_x),
@@ -85,7 +85,7 @@ class CmdVelToSportNode(Node):
 
         request_msg.header = RequestHeader()
         request_msg.header.identity = RequestIdentity()
-        request_msg.header.identity.api_id = self.ROBOT_SPORT_API_ID_STOPMOVE
+        request_msg.header.identity.api_id = self.SPORT_API_ID_STOPMOVE
 
         request_msg.parameter = ""
 
@@ -101,7 +101,7 @@ class CmdVelToSportNode(Node):
 
         request_msg.header = RequestHeader()
         request_msg.header.identity = RequestIdentity()
-        request_msg.header.identity.api_id = self.ROBOT_SPORT_API_ID_BALANCESTAND
+        request_msg.header.identity.api_id = self.SPORT_API_ID_BALANCESTAND
 
         request_msg.parameter = ""
 
@@ -116,9 +116,11 @@ def main(args=None):
 
         node.send_balance_stand_command()
         rclpy.spin(node)
-
     except Exception as e:
         print(f"CmdVelToSportNode encountered an error: {e}")
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

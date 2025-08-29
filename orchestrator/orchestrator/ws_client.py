@@ -35,8 +35,6 @@ class WebSocketClient:
         while self.running and self.connected:
             try:
                 message = self.websocket.recv()
-                formatted_msg = self.format_message(message)
-                self.logger.debug(f"Received WS Message: {formatted_msg}")
                 if self.message_callback:
                     self.message_callback(message)
             except Exception as e:

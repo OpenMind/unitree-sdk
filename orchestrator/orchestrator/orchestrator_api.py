@@ -458,11 +458,23 @@ class OrchestratorAPI(Node):
     def api_request_callback(self, msg: OMAPIRequest):
         """
         Receive API requests from ROS2 topic and handle them.
+
+        Parameters:
+        -----------
+        msg : OMAPIRequest
+            The incoming API request message.
         """
         threading.Thread(target=self._process_api_request, args=(msg,)).start()
 
     def _process_api_request(self, msg: OMAPIRequest):
-        """Process API request in a separate thread."""
+        """
+        Process API request in a separate thread.
+
+        Parameters:
+        -----------
+        msg : OMAPIRequest
+            The incoming API request message.
+        """
         action = msg.action.lower()
         base_url = "http://localhost:5000"
 
@@ -508,6 +520,7 @@ class OrchestratorAPI(Node):
             response_msg.code = response.status_code
             response_msg.status = response.json().get("status", "")
             response_msg.message = response.json().get("message", "")
+
             self.api_response_pub.publish(response_msg)
 
         except requests.exceptions.RequestException as e:

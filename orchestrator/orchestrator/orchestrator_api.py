@@ -7,7 +7,8 @@ from rclpy.node import Node
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from typing import Dict, Optional
-from om_api.msg import MapStorage
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse
+import requests
 
 class ProcessManager:
     """
@@ -106,6 +107,19 @@ class OrchestratorAPI(Node):
         self.api_thread = threading.Thread(target=self.run_flask_app)
         self.api_thread.start()
 
+        self.api_request_sub = self.create_subscription(
+            OMAPIRequest,
+            '/om/api/request',
+            self.api_request_callback,
+            10,
+        )
+
+        self.api_response_pub = self.create_publisher(
+            OMAPIResponse,
+            '/om/api/response',
+            10,
+        )
+
         self.get_logger().info("Orchestrator API Node has been started.")
 
 
@@ -184,7 +198,11 @@ class OrchestratorAPI(Node):
 
             data = request.json
             launch_file = data.get('launch_file', 'nav2_launch.py')
-            map_yaml = data.get('map_yaml', None)
+            map_name = data.get('map_name', None)
+            if not map_name:
+                return jsonify({"status": "error", "message": "map_name is required to start Nav2"}), 400
+
+            map_yaml = os.path.join(self.maps_directory, map_name, f"{map_name}.yaml")
             if self.nav2_manager.start(launch_file, map_yaml):
                 self.manage_base_control()
                 return jsonify({"status": "success", "message": "Nav2 started"}), 200
@@ -436,6 +454,70 @@ class OrchestratorAPI(Node):
         elif not self.should_start_base_control() and self.is_base_control_running():
             self.base_control_manager.stop()
             self.get_logger().info("Base control stopped automatically")
+
+    def api_request_callback(self, msg: OMAPIRequest):
+        """
+        Receive API requests from ROS2 topic and handle them.
+        """
+        threading.Thread(target=self._process_api_request, args=(msg,)).start()
+
+    def _process_api_request(self, msg: OMAPIRequest):
+        """Process API request in a separate thread."""
+        action = msg.action.lower()
+        base_url = "http://localhost:5000"
+
+        try:
+            if action == "start_base_control":
+                self.get_logger().info("Received request to start base control")
+                response = requests.post(f"{base_url}/start/base_control", json={}, timeout=10)
+
+            elif action == "stop_base_control":
+                self.get_logger().info("Received request to stop base control")
+                response = requests.post(f"{base_url}/stop/base_control", json={}, timeout=10)
+
+            elif action == "start_slam":
+                self.get_logger().info("Received request to start SLAM")
+                response = requests.post(f"{base_url}/start/slam", json={}, timeout=10)
+
+            elif action == "stop_slam":
+                self.get_logger().info("Received request to stop SLAM")
+                response = requests.post(f"{base_url}/stop/slam", json={}, timeout=10)
+
+            elif action == "start_nav2":
+                self.get_logger().info("Received request to start Nav2")
+                data = {"map_name": msg.parameter} if msg.parameter else {}
+                response = requests.post(f"{base_url}/start/nav2", json=data, timeout=10)
+
+            elif action == "save_map":
+                self.get_logger().info("Received request to save map")
+                data = {"map_name": msg.parameter} if msg.parameter else {}
+                response = requests.post(f"{base_url}/maps/save", json=data, timeout=30)
+
+            elif action == "list_maps":
+                self.get_logger().info("Received request to list maps")
+                response = requests.get(f"{base_url}/maps/list", timeout=10)
+
+            elif action == "delete_map":
+                self.get_logger().info("Received request to delete map")
+                data = {"map_name": msg.parameter} if msg.parameter else {}
+                response = requests.post(f"{base_url}/maps/delete", json=data, timeout=10)
+
+            response_msg = OMAPIResponse()
+            response_msg.header.stamp = self.get_clock().now().to_msg()
+            response_msg.request_id = msg.request_id
+            response_msg.code = response.status_code
+            response_msg.status = response.json().get("status", "")
+            response_msg.message = response.json().get("message", "")
+            self.api_response_pub.publish(response_msg)
+
+        except requests.exceptions.RequestException as e:
+            self.get_logger().error(f"HTTP request failed: {str(e)}")
+            response_msg = OMAPIResponse()
+            response_msg.request_id = msg.request_id
+            response_msg.code = response.status_code
+            response_msg.status = "error"
+            response_msg.message = response.text
+            self.api_response_pub.publish(response_msg)
 
 def main(args=None):
     """

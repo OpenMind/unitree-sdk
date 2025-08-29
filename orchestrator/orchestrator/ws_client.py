@@ -1,7 +1,7 @@
 import logging
 import threading
 from queue import Queue, Empty
-from typing import Optional
+from typing import Optional, Callable
 
 import websockets
 from websockets.sync.client import connect
@@ -20,8 +20,29 @@ class WebSocketClient:
         self.running: bool = True
         self.connected: bool = False
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
+        self.message_callback: Optional[Callable] = None
         self.message_queue: Queue = Queue()
         self.sender_thread: Optional[threading.Thread] = None
+        self.receiver_thread: Optional[threading.Thread] = None
+
+    def _receive_messages(self):
+        """
+        Internal method to handle receiving messages from the WebSocket connection.
+
+        Continuously receives messages and processes them through the registered callback
+        if one exists. Runs in a separate thread.
+        """
+        while self.running and self.connected:
+            try:
+                message = self.websocket.recv()
+                formatted_msg = self.format_message(message)
+                self.logger.debug(f"Received WS Message: {formatted_msg}")
+                if self.message_callback:
+                    self.message_callback(message)
+            except Exception as e:
+                self.logger.error(f"Error in message processing: {e}")
+                self.connected = False
+                break
 
     def _send_messages(self):
         """
@@ -60,6 +81,12 @@ class WebSocketClient:
         try:
             self.websocket = connect(self.url)
             self.connected = True
+
+            if not self.receiver_thread or not self.receiver_thread.is_alive():
+                self.receiver_thread = threading.Thread(
+                    target=self._receive_messages, daemon=True
+                )
+                self.receiver_thread.start()
 
             if not self.sender_thread or not self.sender_thread.is_alive():
                 self.sender_thread = threading.Thread(

@@ -81,7 +81,7 @@ def generate_launch_description():
                 'enable_gyro': False,
                 'enable_accel': False,
                 'unite_imu_method': 0,
-                'depth_module.depth_profile': '424x240x15'
+                'depth_module.depth_profile': '480x270x15'
             }],
             output='screen',
             respawn=True,

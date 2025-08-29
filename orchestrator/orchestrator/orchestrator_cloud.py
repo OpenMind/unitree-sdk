@@ -2,8 +2,8 @@ import os
 import requests
 import rclpy
 from rclpy.node import Node
-from typing import Optional
-from om_api.msg import MapStorage
+from uuid import uuid4
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
 import json
@@ -13,6 +13,7 @@ from .ws_client import WebSocketClient
 map_api_url = "https://api.openmind.org/api/core/maps/upload"
 pose_ws_url = "wss://api.openmind.org/api/core/teleops/pose"
 map_ws_url = "wss://api.openmind.org/api/core/teleops/maps"
+api_ws_url = "wss://api.openmind.org/api/core/teleops/api"
 
 class OrchestratorCloud(Node):
     """
@@ -46,17 +47,36 @@ class OrchestratorCloud(Node):
             10,
         )
 
+        self.api_request_pub = self.create_publisher(
+            OMAPIRequest,
+            '/om/api/request',
+            10,
+        )
+
+        self.api_response_sub = self.create_subscription(
+            OMAPIResponse,
+            '/om/api/response',
+            self.api_response_callback,
+            10,
+        )
+
         self.pose_ws_url = f"{pose_ws_url}?api_key={self.api_key}" if self.api_key else None
         self.map_ws_url = f"{map_ws_url}?api_key={self.api_key}" if self.api_key else None
+        self.api_ws_url = f"{api_ws_url}?api_key={self.api_key}" if self.api_key else None
 
         self.pose_ws = WebSocketClient(self.pose_ws_url, self.get_logger()) if self.pose_ws_url else None
         self.map_ws = WebSocketClient(self.map_ws_url, self.get_logger()) if self.map_ws_url else None
+        self.api_ws = WebSocketClient(self.api_ws_url, self.get_logger()) if self.api_ws_url else None
 
         if self.pose_ws:
             self.pose_ws.start()
 
         if self.map_ws:
             self.map_ws.start()
+
+        if self.api_ws:
+            self.api_ws.start()
+            self.api_ws.message_callback = self.api_request_callback
 
         self.get_logger().info("Orchestrator Cloud Node Initialized")
 
@@ -200,6 +220,61 @@ class OrchestratorCloud(Node):
                 self.get_logger().info("Map data sent.")
             except Exception as e:
                 self.get_logger().error(f"Failed to send map data: {e}")
+
+    def api_request_callback(self, message: str):
+        """
+        Callback function for messages received from the API WebSocket.
+
+        Parameters:
+        -----------
+        message : str
+            The incoming message from the API WebSocket.
+        """
+        try:
+            msg_json = json.loads(message)
+            api_msg = OMAPIRequest()
+            api_msg.header.stamp.sec = int(msg_json.get('time', 0))
+            api_msg.header.stamp.nanosec = int((msg_json.get('time', 0) - api_msg.header.stamp.sec) * 1e9)
+            api_msg.request_id = msg_json.get('request_id', str(uuid4()))
+            api_msg.action = msg_json.get('action', '')
+            api_msg.parameters = msg_json.get('parameters', '')
+
+            if api_msg.action == '':
+                self.get_logger().warning("Received API message with missing fields.")
+                return
+
+            self.api_request_pub.publish(api_msg)
+            self.get_logger().info(f"Published API message: action={api_msg.action}, status={api_msg.status}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to process API message: {e}")
+
+    def api_response_callback(self, response: OMAPIResponse):
+        """
+        Callback function for OMAPIResponse messages.
+
+        Parameters:
+        -----------
+        response : om_api.msg.OMAPIResponse
+            The incoming OMAPIResponse message containing the API response details.
+        """
+        if not self.api_key:
+            self.get_logger().error("Cannot send API response: OM_API_KEY not set.")
+            return
+
+        response_data = {
+            "time": response.header.stamp.sec + response.header.stamp.nanosec * 1e-9,
+            "request_id": response.request_id,
+            "code": response.code,
+            "status": response.status,
+            "message": response.message
+        }
+
+        if self.api_ws and self.api_ws.connected:
+            try:
+                self.api_ws.send_message(json.dumps(response_data))
+                self.get_logger().info("API response sent.")
+            except Exception as e:
+                self.get_logger().error(f"Failed to send API response: {e}")
 
 def main(args=None):
     """

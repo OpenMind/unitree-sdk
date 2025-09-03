@@ -33,12 +33,11 @@ jobs:
         with:
           images: openmindagi/unitree_go2_sdk
           tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
-            type=ref,event=tag,enable=${{ github.event_name == 'release' }}
-            type=ref,event=branch
-            type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }},prereleases=true
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }},prereleases=true
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'release' }},prereleases=true
+            type=sha
 
       - name: Build and push AMD64 image by digest
         id: build
@@ -48,7 +47,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=openmindagi/unitree_go2_sdk,push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ steps.meta.outputs.tags }}
 
   build-arm64:
     runs-on: ubuntu-22.04-arm  # Your ARM64 runner
@@ -73,12 +72,11 @@ jobs:
         with:
           images: openmindagi/unitree_go2_sdk
           tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
-            type=ref,event=tag,enable=${{ github.event_name == 'release' }}
-            type=ref,event=branch
-            type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }},prereleases=true
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }},prereleases=true
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'release' }},prereleases=true
+            type=sha
 
       - name: Build and push ARM64 image by digest
         id: build
@@ -88,7 +86,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=openmindagi/unitree_go2_sdk,push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ steps.meta.outputs.tags }}
 
   create-manifest:
     runs-on: ubuntu-latest

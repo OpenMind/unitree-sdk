@@ -46,7 +46,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=openmindagi/om1_avatar,push-by-digest=true,name-canonical=true,push=true
 
   build-arm64:
     runs-on: ubuntu-22.04-arm  # Your ARM64 runner
@@ -85,7 +85,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=image,name=openmindagi/om1_avatar,push-by-digest=true,name-canonical=true,push=true
 
   create-manifest:
     runs-on: ubuntu-latest

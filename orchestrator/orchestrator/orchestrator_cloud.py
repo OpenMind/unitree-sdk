@@ -11,16 +11,17 @@ import json
 from .ws_client import WebSocketClient
 
 env = os.getenv('ENV', 'production')
-if env == 'development':
-    map_api_url = "https://api-dev.openmind.org/api/core/maps/upload"
-    pose_ws_url = "wss://api-dev.openmind.org/api/core/teleops/pose"
-    map_ws_url = "wss://api-dev.openmind.org/api/core/teleops/maps"
-    api_ws_url = "wss://api-dev.openmind.org/api/core/teleops/api"
 
 map_api_url = "https://api.openmind.org/api/core/maps/upload"
 pose_ws_url = "wss://api.openmind.org/api/core/teleops/pose"
 map_ws_url = "wss://api.openmind.org/api/core/teleops/maps"
 api_ws_url = "wss://api.openmind.org/api/core/teleops/api"
+
+if env == 'development':
+    map_api_url = "https://api-dev.openmind.org/api/core/maps/upload"
+    pose_ws_url = "wss://api-dev.openmind.org/api/core/teleops/pose"
+    map_ws_url = "wss://api-dev.openmind.org/api/core/teleops/maps"
+    api_ws_url = "wss://api-dev.openmind.org/api/core/teleops/api"
 
 class OrchestratorCloud(Node):
     """

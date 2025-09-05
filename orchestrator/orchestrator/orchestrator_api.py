@@ -514,6 +514,10 @@ class OrchestratorAPI(Node):
                 data = {"map_name": msg.parameter} if msg.parameter else {}
                 response = requests.post(f"{base_url}/maps/delete", json=data, timeout=10)
 
+            elif action == "status":
+                self.get_logger().info("Received request for status")
+                response = requests.get(f"{base_url}/status", timeout=10)
+
             response_msg = OMAPIResponse()
             response_msg.header.stamp = self.get_clock().now().to_msg()
             response_msg.request_id = msg.request_id

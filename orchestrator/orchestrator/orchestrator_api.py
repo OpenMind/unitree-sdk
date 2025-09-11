@@ -497,12 +497,12 @@ class OrchestratorAPI(Node):
 
             elif action == "start_nav2":
                 self.get_logger().info("Received request to start Nav2")
-                data = {"map_name": msg.parameter} if msg.parameter else {}
+                data = {"map_name": msg.parameters} if msg.parameters else {}
                 response = requests.post(f"{base_url}/start/nav2", json=data, timeout=10)
 
             elif action == "save_map":
                 self.get_logger().info("Received request to save map")
-                data = {"map_name": msg.parameter} if msg.parameter else {}
+                data = {"map_name": msg.parameters} if msg.parameters else {}
                 response = requests.post(f"{base_url}/maps/save", json=data, timeout=30)
 
             elif action == "list_maps":
@@ -511,7 +511,7 @@ class OrchestratorAPI(Node):
 
             elif action == "delete_map":
                 self.get_logger().info("Received request to delete map")
-                data = {"map_name": msg.parameter} if msg.parameter else {}
+                data = {"map_name": msg.parameters} if msg.parameters else {}
                 response = requests.post(f"{base_url}/maps/delete", json=data, timeout=10)
 
             elif action == "status":

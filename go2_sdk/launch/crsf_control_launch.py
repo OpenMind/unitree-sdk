@@ -1,11 +1,21 @@
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, EnvironmentVariable
 from launch_ros.actions import Node
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('go2_sdk')
 
+    serial_port_arg = DeclareLaunchArgument(
+        'serial_port',
+        default_value=EnvironmentVariable('CRSF_SERIAL_PORT', default_value='/dev/ttyUSB1'),
+        description='Serial port for CRSF controller'
+    )
+
     return LaunchDescription([
+        serial_port_arg,
+
         Node(
             package='go2_sdk',
             executable='cmd_vel_to_go2',
@@ -15,16 +25,12 @@ def generate_launch_description():
 
         Node(
             package='go2_sdk',
-            executable='go2_sport_action',
-            name='go2_sport_action',
-            output='screen',
-        ),
-
-        Node(
-            package='go2_sdk',
             executable='crsf_controller',
             name='crsf_controller',
-            output='screen'
+            output='screen',
+            parameters=[{
+                'serial_port': LaunchConfiguration('serial_port'),
+            }]
         ),
 
         # RB is the enable button
@@ -48,4 +54,3 @@ def generate_launch_description():
             }]
         ),
     ])
--

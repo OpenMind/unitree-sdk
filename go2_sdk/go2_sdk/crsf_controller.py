@@ -46,7 +46,7 @@ class CrsfJoyBridge(Node):
     def __init__(self):
         super().__init__('crsf_joy_bridge')
 
-        self.declare_parameter('serial_port', '/dev/ttyUSB0')
+        self.declare_parameter('serial_port', '/dev/ttyUSB1')
         self.declare_parameter('baud_rate', 420000)
         self.declare_parameter('publish_rate', 50.0)
         self.declare_parameter('deadband', 0.3)
@@ -66,7 +66,7 @@ class CrsfJoyBridge(Node):
         self.latest_joy.axes = [0.0] * 4  # LLR, LUD, RLR, RUD (centered at 0)
         self.latest_joy.buttons = [0] * 6  # SWA through SWF
 
-        self.timer = self.create_timer(self.publish_rate, self.publish_joy)
+        self.timer = self.create_timer(1.0 / self.publish_rate, self.publish_joy)
 
         self.start_serial()
 
@@ -125,7 +125,7 @@ class CrsfJoyBridge(Node):
             lud = (n(rc_packet[2]) - 0.5) * 2.0  # Left stick up/down
             llr = (n(rc_packet[3]) - 0.5) * 2.0  # Left stick left/right
             rud = (n(rc_packet[0]) - 0.5) * 2.0  # Right stick up/down
-            rlr = (n(rc_packet[1]) - 0.5) * 2.0  # Right stick left/right
+            rlr = (n(rc_packet[1]) - 0.5) * - 2.0  # Right stick left/right
 
             if abs(lud) < self.get_parameter('deadband').value:
                 lud = 0.0

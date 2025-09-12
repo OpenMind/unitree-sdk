@@ -165,7 +165,7 @@ def generate_launch_description():
                 'enable_button': 10,
                 'scale_linear.x': 0.5,
                 'scale_angular.z': 1.0,
-                'enable_turbo_button': 13,
+                'enable_turbo_button': 7,
                 'scale_turbo_linear.x': 1.5,
                 'scale_turbo_angular.z': 2.0,
             }]

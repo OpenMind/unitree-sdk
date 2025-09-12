@@ -252,7 +252,7 @@ class OrchestratorCloud(Node):
                 return
 
             self.api_request_pub.publish(api_msg)
-            self.get_logger().info(f"Published API message: action={api_msg.action}, status={api_msg.status}")
+            self.get_logger().info(f"Published API request: {api_msg.action} with ID {api_msg.request_id} and parameters {api_msg.parameters}")
         except Exception as e:
             self.get_logger().error(f"Failed to process API message: {e}")
 

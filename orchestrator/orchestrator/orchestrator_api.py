@@ -500,6 +500,10 @@ class OrchestratorAPI(Node):
                 data = {"map_name": msg.parameters} if msg.parameters else {}
                 response = requests.post(f"{base_url}/start/nav2", json=data, timeout=10)
 
+            elif action == "stop_nav2":
+                self.get_logger().info("Received request to stop Nav2")
+                response = requests.post(f"{base_url}/stop/nav2", json={}, timeout=10)
+
             elif action == "save_map":
                 self.get_logger().info("Received request to save map")
                 data = {"map_name": msg.parameters} if msg.parameters else {}

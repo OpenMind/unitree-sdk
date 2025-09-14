@@ -5,6 +5,7 @@ import docker
 from docker.errors import DockerException, NotFound, APIError
 import rclpy
 import zenoh
+from .zenoh_sesson import open_zenoh_session
 from rclpy.node import Node
 
 from sensor_msgs.msg import LaserScan
@@ -47,7 +48,7 @@ class WatchSensor(Node):
             10,
         )
 
-        self.zenoh_session = zenoh.open(zenoh.Config())
+        self.zenoh_session = open_zenoh_session()
         self.zenoh_session.declare_subscriber("om/paths", self.zenoh_paths_callback)
 
     def ros2_paths_callback(self, msg: Paths):

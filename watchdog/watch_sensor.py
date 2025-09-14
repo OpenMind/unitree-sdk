@@ -5,7 +5,7 @@ import docker
 from docker.errors import DockerException, NotFound, APIError
 import rclpy
 import zenoh
-from .zenoh_sesson import open_zenoh_session
+from zenoh_sesson import open_zenoh_session
 from rclpy.node import Node
 
 from sensor_msgs.msg import LaserScan

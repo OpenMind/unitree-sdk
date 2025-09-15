@@ -235,6 +235,9 @@ class OrchestratorAPI(Node):
                 map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
                 locations_file = os.path.join(self.locations_directory, 'locations.json')
 
+                os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
+                os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
+
                 existing_locations = []
                 if os.path.exists(map_locations_file):
                     try:
@@ -374,12 +377,15 @@ class OrchestratorAPI(Node):
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Invalid location data: {str(e)}"}), 400
 
-            if 'map_name' not in location:
-                return jsonify({"status": "error", "message": "map_name is required in location data"}), 400
-            map_name = location['map_name']
+            if 'map_name' not in data:
+                return jsonify({"status": "error", "message": "map_name is required in data"}), 400
+            map_name = data['map_name']
 
             map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
             locations_file = os.path.join(self.locations_directory, 'locations.json')
+
+            os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
+            os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
 
             existing_locations = []
             if os.path.exists(map_locations_file):

@@ -6,3 +6,4 @@ _pycache/
 *.pyc
 
 maps/
+locations/

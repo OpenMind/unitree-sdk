@@ -1,5 +1,6 @@
 import rclpy
 import threading
+import json
 import os
 import signal
 import subprocess
@@ -9,6 +10,28 @@ from flask_cors import CORS
 from typing import Dict, Optional
 from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse
 import requests
+from pydantic import BaseModel, Field
+
+class PoseModel(BaseModel):
+    x: float = Field(..., description="X coordinate")
+    y: float = Field(..., description="Y coordinate")
+    z: float = Field(..., description="Z coordinate")
+
+class OrientationModel(BaseModel):
+    x: float = Field(..., description="X component of orientation")
+    y: float = Field(..., description="Y component of orientation")
+    z: float = Field(..., description="Z component of orientation")
+    w: float = Field(..., description="W component of orientation")
+
+class PoseModel(BaseModel):
+    position: PoseModel = Field(..., description="Position with x, y, z coordinates")
+    orientation: OrientationModel = Field(..., description="Orientation with x, y, z, w components")
+
+class LocationModel(BaseModel):
+    name: str = Field(..., description="Name of the location")
+    description: Optional[str] = Field(None, description="Description of the location")
+    timestamp: Optional[str] = Field(None, description="Timestamp of the location")
+    pose: PoseModel = Field(..., description="Pose of the location")
 
 class ProcessManager:
     """
@@ -98,7 +121,10 @@ class OrchestratorAPI(Node):
         self.map_saver_publisher = self.create_publisher(MapStorage, '/om/map_storage', 10)
 
         self.maps_directory = os.path.abspath("./maps")
+        self.locations_directory = os.path.abspath("./locations")
+
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
+        os.makedirs(self.locations_directory, mode=0o755, exist_ok=True)
 
         self.app = Flask(__name__)
         CORS(self.app)
@@ -205,6 +231,27 @@ class OrchestratorAPI(Node):
             map_yaml = os.path.join(self.maps_directory, map_name, f"{map_name}.yaml")
             if self.nav2_manager.start(launch_file, map_yaml):
                 self.manage_base_control()
+
+                map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
+                locations_file = os.path.join(self.locations_directory, 'locations.json')
+
+                os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
+                os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
+
+                existing_locations = []
+                if os.path.exists(map_locations_file):
+                    try:
+                        with open(map_locations_file, 'r') as f:
+                            existing_locations = json.load(f)
+                    except Exception as e:
+                        self.get_logger().error(f"The locations file for map {map_name} is corrupted: {str(e)}")
+
+                with open(map_locations_file, 'w') as f:
+                    json.dump(existing_locations, f, indent=4)
+
+                with open(locations_file, 'w') as f:
+                    json.dump(existing_locations, f, indent=4)
+
                 return jsonify({"status": "success", "message": "Nav2 started"}), 200
             else:
                 return jsonify({"status": "error", "message": "Nav2 is already running"}), 400
@@ -312,6 +359,76 @@ class OrchestratorAPI(Node):
                 return jsonify({"status": "success", "message": f"Map {map_name} deleted"}), 200
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Failed to delete map: {str(e)}"}), 500
+
+        @self.app.route('/maps/locations/add', methods=['POST'])
+        def add_map_location():
+            """
+            Add a single location to the existing map locations JSON file.
+            """
+            data = request.json
+            if not data or 'location' not in data:
+                return jsonify({"status": "error", "message": "location data is required"}), 400
+
+            location_data = data['location']
+
+            try:
+                validated_location = LocationModel(**location_data)
+                location = validated_location.model_dump()
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Invalid location data: {str(e)}"}), 400
+
+            if 'map_name' not in data:
+                return jsonify({"status": "error", "message": "map_name is required in data"}), 400
+            map_name = data['map_name']
+
+            map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
+            locations_file = os.path.join(self.locations_directory, 'locations.json')
+
+            os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
+            os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
+
+            existing_locations = []
+            if os.path.exists(map_locations_file):
+                try:
+                    with open(map_locations_file, 'r') as f:
+                        existing_locations = json.load(f)
+                except Exception as e:
+                    return jsonify({"status": "error", "message": f"Failed to read existing locations: {str(e)}"}), 500
+
+            for i, existing_loc in enumerate(existing_locations):
+                if existing_loc.get('name') == location['name']:
+                    existing_locations[i] = location
+                    break
+            else:
+                existing_locations.append(location)
+
+            try:
+                with open(map_locations_file, 'w') as f:
+                    json.dump(existing_locations, f, indent=4)
+
+                with open(locations_file, 'w') as f:
+                    json.dump(existing_locations, f, indent=4)
+
+                return jsonify({"status": "success", "message": f"Location '{location['name']}' added/updated"}), 200
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Failed to save location: {str(e)}"}), 500
+
+        @self.app.route('/maps/locations/list', methods=['GET'])
+        def list_map_locations():
+            """
+            List all saved map locations.
+            """
+            locations_file = os.path.join(self.locations_directory, 'locations.json')
+
+            if not os.path.exists(locations_file):
+                return jsonify({"locations": []}), 200
+
+            try:
+                with open(locations_file, 'r') as f:
+                    locations = json.load(f)
+                return jsonify({"status": "success", "message": json.dumps(locations)}), 200
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Failed to read locations: {str(e)}"}), 500
 
     def save_map(self, map_name: str, map_directory: Optional[str] = None) -> Dict[str, str]:
         """
@@ -521,6 +638,30 @@ class OrchestratorAPI(Node):
             elif action == "status":
                 self.get_logger().info("Received request for status")
                 response = requests.get(f"{base_url}/status", timeout=10)
+
+            elif action == "list_locations":
+                self.get_logger().info("Received request to list map locations")
+                response = requests.get(f"{base_url}/maps/locations/list", timeout=10)
+
+            elif action == "add_location":
+                self.get_logger().info("Received request to add map location")
+                try:
+                    location_data = json.loads(msg.parameters) if msg.parameters else {}
+                except json.JSONDecodeError:
+                    location_data = {}
+                data = {"location": location_data} if location_data else {}
+                response = requests.post(f"{base_url}/maps/locations/add", json=data, timeout=10)
+
+            else:
+                self.get_logger().error(f"Unknown action: {action}")
+                response_msg = OMAPIResponse()
+                response_msg.header.stamp = self.get_clock().now().to_msg()
+                response_msg.request_id = msg.request_id
+                response_msg.code = 400
+                response_msg.status = "error"
+                response_msg.message = f"Unknown action: {action}"
+                self.api_response_pub.publish(response_msg)
+                return
 
             response_msg = OMAPIResponse()
             response_msg.header.stamp = self.get_clock().now().to_msg()

@@ -112,9 +112,8 @@ services:
       - /run/udev:/run/udev:ro
       - /sys:/sys:ro
       - ./cyclonedds:/cyclonedds
-      - .:/ros2_ws/src/unitree_go2_ros2_sdk:rw
-      - ./maps:/ros2_ws/src/unitree_go2_ros2_sdk/maps:rw
-      - ./locations:/ros2_ws/src/unitree_go2_ros2_sdk/locations:rw
+      - ./maps:/app/unitree_go2_ros2_sdk/maps:rw
+      - ./locations:/app/unitree_go2_ros2_sdk/locations:rw
     logging:
       driver: "json-file"
       options:

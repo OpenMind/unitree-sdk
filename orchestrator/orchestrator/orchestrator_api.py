@@ -12,7 +12,7 @@ from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse
 import requests
 from pydantic import BaseModel, Field
 
-class PoseModel(BaseModel):
+class PositionModel(BaseModel):
     x: float = Field(..., description="X coordinate")
     y: float = Field(..., description="Y coordinate")
     z: float = Field(..., description="Z coordinate")
@@ -24,7 +24,7 @@ class OrientationModel(BaseModel):
     w: float = Field(..., description="W component of orientation")
 
 class PoseModel(BaseModel):
-    position: PoseModel = Field(..., description="Position with x, y, z coordinates")
+    position: PositionModel = Field(..., description="Position with x, y, z coordinates")
     orientation: OrientationModel = Field(..., description="Orientation with x, y, z, w components")
 
 class LocationModel(BaseModel):
@@ -238,7 +238,7 @@ class OrchestratorAPI(Node):
                 os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
                 os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
 
-                existing_locations = []
+                existing_locations = {}
                 if os.path.exists(map_locations_file):
                     try:
                         with open(map_locations_file, 'r') as f:
@@ -387,7 +387,7 @@ class OrchestratorAPI(Node):
             os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
             os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
 
-            existing_locations = []
+            existing_locations = {}
             if os.path.exists(map_locations_file):
                 try:
                     with open(map_locations_file, 'r') as f:
@@ -395,12 +395,7 @@ class OrchestratorAPI(Node):
                 except Exception as e:
                     return jsonify({"status": "error", "message": f"Failed to read existing locations: {str(e)}"}), 500
 
-            for i, existing_loc in enumerate(existing_locations):
-                if existing_loc.get('name') == location['name']:
-                    existing_locations[i] = location
-                    break
-            else:
-                existing_locations.append(location)
+            existing_locations[location['name']] = location
 
             try:
                 with open(map_locations_file, 'w') as f:

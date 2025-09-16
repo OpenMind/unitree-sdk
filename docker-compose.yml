@@ -113,7 +113,7 @@ services:
       - /sys:/sys:ro
       - ./cyclonedds:/cyclonedds
       - ./maps:/app/unitree_go2_ros2_sdk/maps:rw
-      - ./locations:/app/unitree_go2_ros2_sdk/locations:rw
+      - ${HOME}/shared_data/locations:/app/unitree_go2_ros2_sdk/locations:rw
     logging:
       driver: "json-file"
       options:

@@ -648,8 +648,15 @@ class OrchestratorAPI(Node):
                 try:
                     location_data = json.loads(msg.parameters) if msg.parameters else {}
                 except json.JSONDecodeError:
-                    location_data = {}
-                data = {"location": location_data} if location_data else {}
+                    raise ValueError("Invalid JSON in parameters")
+
+                if 'map_name' not in location_data:
+                    raise ValueError("map_name is required in location data")
+
+                if 'location' not in location_data:
+                    raise ValueError("location data is required in location data")
+
+                data = {"map_name": location_data['map_name'], "location": location_data['location']}
                 response = requests.post(f"{base_url}/maps/locations/add", json=data, timeout=10)
 
             else:

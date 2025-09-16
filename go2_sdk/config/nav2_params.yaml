@@ -159,32 +159,27 @@ controller_server:
       trans_stopped_velocity: 0.1
       short_circuit_trajectory_evaluation: True
       stateful: True
-      critics: ["BaseObstacle", "RotateToGoal", "Oscillation", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle:
-        scale: 1.0
-      PathAlign:
-        scale: 16.0
-        forward_point_distance: 0.1
-      GoalAlign:
-        scale: 12.0
-        forward_point_distance: 0.1
-      PathDist:
-        scale: 16.0
-      GoalDist:
-        scale: 12.0
-      RotateToGoal:
-        scale: 16.0
-        slowing_factor: 5.0
-        lookahead_time: -1.0
-      Oscillation:
-        scale: 1.0
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 32.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 24.0
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
 
     RecoveryController:
       plugin: "dwb_core::DWBLocalPlanner"
-      robot_radius: 0.15
-      min_vel_x: -0.15
-      max_vel_x: 0.15
-      sim_time: 1.2
+      robot_radius: 0.22
+      min_vel_x: -0.05
+      max_vel_x: 0.26
+      max_vel_theta: 1.0
+      sim_time: 2.0
+      acc_lim_x: 2.5
+      acc_lim_theta: 3.2
       BaseObstacle:
         scale: 0.3
       critics: ["BaseObstacle", "GoalDist"]

@@ -245,7 +245,11 @@ class OrchestratorCloud(Node):
             api_msg.header.stamp.nanosec = int((msg_json.get('time', 0) - api_msg.header.stamp.sec) * 1e9)
             api_msg.request_id = msg_json.get('request_id', str(uuid4()))
             api_msg.action = msg_json.get('action', '')
-            api_msg.parameters = msg_json.get('parameters', '')
+            parameters = msg_json.get('parameters', '')
+            if isinstance(parameters, dict):
+                api_msg.parameters = json.dumps(parameters)
+            else:
+                api_msg.parameters = str(parameters)
 
             if api_msg.action == '':
                 self.get_logger().warning("Received API message with missing fields.")

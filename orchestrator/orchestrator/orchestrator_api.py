@@ -275,7 +275,14 @@ class OrchestratorAPI(Node):
             slam_status = "running" if self.slam_manager.process and self.slam_manager.process.poll() is None else "stopped"
             nav2_status = "running" if self.nav2_manager.process and self.nav2_manager.process.poll() is None else "stopped"
             base_control_status = "running" if self.base_control_manager.process and self.base_control_manager.process.poll() is None else "stopped"
-            return jsonify({"slam_status": slam_status, "nav2_status": nav2_status, "base_control_status": base_control_status}), 200
+            
+            status_data = {
+                "slam_status": slam_status,
+                "nav2_status": nav2_status, 
+                "base_control_status": base_control_status
+            }
+            
+            return jsonify({"status": "success", "message": json.dumps(status_data)}), 200
 
         @self.app.route('/maps/save', methods=['POST'])
         def save_map():

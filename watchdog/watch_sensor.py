@@ -7,6 +7,7 @@ import rclpy
 import zenoh
 from zenoh_sesson import open_zenoh_session
 from rclpy.node import Node
+import cv2
 
 from sensor_msgs.msg import LaserScan
 from om_api.msg import Paths
@@ -19,10 +20,14 @@ class WatchSensor(Node):
         self.last_scan_time = time.time()
         self.last_paths_time = time.time()
         self.last_zenoh_time = time.time()
+        self.last_rtsp_time = time.time()
         self.timeout_duration = float(os.getenv('SENSOR_TIMEOUT_DURATION', '30.0'))
+        self.rtsp_url = os.getenv('RTSP_URL', 'rtsp://localhost:8554/live')
+        self.rtsp_decode_format = os.getenv('RTSP_DECODE_FORMAT', 'H264')
 
         self.sensor_service_name = os.getenv('SENSOR_SERVICE_NAME', 'om1_sensor')
         self.zenoh_service_name = os.getenv('ZENOH_SERVICE_NAME', 'zenoh_bridge')
+        self.mediamtx_service_name = os.getenv('MEDIAMTX_SERVICE_NAME', 'mediamtx')
 
         try:
             self.docker_client = docker.from_env()
@@ -33,6 +38,9 @@ class WatchSensor(Node):
 
         self.watchdog_thread = threading.Thread(target=self.watchdog_loop, daemon=True)
         self.watchdog_thread.start()
+
+        self.rtsp_monitor_thread = threading.Thread(target=self.rtsp_monitor_loop, daemon=True)
+        self.rtsp_monitor_thread.start()
 
         self.paths_subscription = self.create_subscription(
             Paths,
@@ -87,6 +95,36 @@ class WatchSensor(Node):
         self.last_zenoh_time = time.time()
         self.get_logger().debug("Received paths message via Zenoh")
 
+    def rtsp_monitor_loop(self):
+        """
+        Monitor RTSP stream and update last_rtsp_time when images are received
+        """
+        cap = None
+        while True:
+            try:
+                if cap is None:
+                    cap = cv2.VideoCapture(self.rtsp_url)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    cap.set(cv2.CAP_PROP_FPS, 5)
+                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*self.rtsp_decode_format))
+                    self.get_logger().info(f"Connected to RTSP stream: {self.rtsp_url}")
+
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    self.last_rtsp_time = time.time()
+                    self.get_logger().debug("Received RTSP frame")
+                else:
+                    self.get_logger().debug("Failed to read RTSP frame")
+
+                time.sleep(5.0)
+
+            except Exception as e:
+                self.get_logger().error(f"RTSP monitoring error: {str(e)}")
+                if cap is not None:
+                    cap.release()
+                    cap = None
+                time.sleep(5.0)
+
     def restart_container(self, service_name: str) -> bool:
         """
         Restart a container
@@ -125,6 +163,7 @@ class WatchSensor(Node):
                 scan_timeout = (current_time - self.last_scan_time) > self.timeout_duration
                 paths_timeout = (current_time - self.last_paths_time) > self.timeout_duration
                 zenoh_timeout = (current_time - self.last_zenoh_time) > self.timeout_duration
+                rtsp_timeout = (current_time - self.last_rtsp_time) > self.timeout_duration
 
                 if scan_timeout or paths_timeout:
                     missing_topics = []
@@ -145,6 +184,11 @@ class WatchSensor(Node):
                     self.get_logger().warn(f"Zenoh paths missing for {self.timeout_duration}s. Restarting Zenoh container...")
                     self.restart_container(self.zenoh_service_name)
                     self.last_zenoh_time = time.time()
+
+                if rtsp_timeout:
+                    self.get_logger().warn(f"RTSP stream not responding for {self.timeout_duration}s. Restarting MediaMTX container...")
+                    self.restart_container(self.mediamtx_service_name)
+                    self.last_rtsp_time = time.time()
 
                 time.sleep(1.0)
 

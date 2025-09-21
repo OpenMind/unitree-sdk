@@ -112,9 +112,9 @@ class WatchSensor(Node):
                 ret, frame = cap.read()
                 if ret and frame is not None:
                     self.last_rtsp_time = time.time()
-                    self.get_logger().debug("Received RTSP frame")
+                    self.get_logger().info("Received RTSP frame")
                 else:
-                    self.get_logger().debug("Failed to read RTSP frame")
+                    self.get_logger().info("Failed to read RTSP frame")
 
                 time.sleep(5.0)
 

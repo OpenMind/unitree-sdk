@@ -693,7 +693,7 @@ class OrchestratorAPI(Node):
                 response = requests.post(f"{base_url}/maps/locations/add", json=data, timeout=10)
 
             elif action == "ai_status":
-                # Code 2 is for status request
+                # Code 2 is for a status request
                 self.get_logger().info("Received request for AI status")
                 ai_request_msg = OMAIRequest()
                 ai_request_msg.header.stamp = self.get_clock().now().to_msg()
@@ -703,7 +703,7 @@ class OrchestratorAPI(Node):
                 return
 
             elif action == "enable_ai":
-                # Code 1 is for enable AI
+                # Code 1 is for enabling AI
                 self.get_logger().info("Received request to enable AI")
                 ai_request_msg = OMAIRequest()
                 ai_request_msg.header.stamp = self.get_clock().now().to_msg()
@@ -714,7 +714,7 @@ class OrchestratorAPI(Node):
                 return
 
             elif action == "disable_ai":
-                # Code 0 is for disable AI
+                # Code 0 is for disabling AI
                 self.get_logger().info("Received request to disable AI")
                 ai_request_msg = OMAIRequest()
                 ai_request_msg.header.stamp = self.get_clock().now().to_msg()

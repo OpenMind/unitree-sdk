@@ -27,6 +27,8 @@
                       ".*/utlidar/robot_odom",
                       ".*/utlidar/robot_pose",
                       ".*/om/pose",
+                      ".*/om/ai/request",
+                      ".*/om/ai/response",
 
                       // Motion control
                       ".*/cmd_vel",
@@ -125,6 +127,8 @@
                       ".*/utlidar/robot_odom",
                       ".*/utlidar/robot_pose",
                       ".*/om/pose",
+                      ".*/om/ai/request",
+                      ".*/om/ai/response",
 
                       // Motion control
                       ".*/cmd_vel",

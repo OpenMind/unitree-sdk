@@ -8,7 +8,7 @@ from rclpy.node import Node
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from typing import Dict, Optional
-from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse
 import requests
 from pydantic import BaseModel, Field
 

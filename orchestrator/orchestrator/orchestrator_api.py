@@ -459,7 +459,7 @@ class OrchestratorAPI(Node):
         response_msg.request_id = msg.request_id
         response_msg.code = msg.code
         response_msg.status = msg.status
-        response_msg.message = ""
+        response_msg.message = msg.status
 
         self.api_response_pub.publish(response_msg)
 
@@ -707,6 +707,7 @@ class OrchestratorAPI(Node):
                 self.get_logger().info("Received request to enable AI")
                 ai_request_msg = OMAIRequest()
                 ai_request_msg.header.stamp = self.get_clock().now().to_msg()
+                ai_request_msg.header.frame_id = "om_api"
                 ai_request_msg.request_id = msg.request_id
                 ai_request_msg.code = 1
                 self.ai_request_pub.publish(ai_request_msg)
@@ -717,6 +718,7 @@ class OrchestratorAPI(Node):
                 self.get_logger().info("Received request to disable AI")
                 ai_request_msg = OMAIRequest()
                 ai_request_msg.header.stamp = self.get_clock().now().to_msg()
+                ai_request_msg.header.frame_id = "om_api"
                 ai_request_msg.request_id = msg.request_id
                 ai_request_msg.code = 0
                 self.ai_request_pub.publish(ai_request_msg)
@@ -726,6 +728,7 @@ class OrchestratorAPI(Node):
                 self.get_logger().error(f"Unknown action: {action}")
                 response_msg = OMAPIResponse()
                 response_msg.header.stamp = self.get_clock().now().to_msg()
+                ai_request_msg.header.frame_id = "om_api"
                 response_msg.request_id = msg.request_id
                 response_msg.code = 400
                 response_msg.status = "error"

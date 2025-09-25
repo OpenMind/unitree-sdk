@@ -25,6 +25,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MapStorage.msg"
   "msg/OMAPIRequest.msg"
   "msg/OMAPIResponse.msg"
+  "msg/OMAIRequest.msg"
+  "msg/OMAIReponse.msg"
   DEPENDENCIES std_msgs
 )
 

@@ -146,6 +146,19 @@ class OrchestratorAPI(Node):
             10,
         )
 
+        self.ai_request_pub = self.create_publisher(
+            OMAIRequest,
+            '/om/ai/request',
+            10,
+        )
+
+        self.ai_request_sub = self.create_subscription(
+            OMAIReponse,
+            '/om/ai/response',
+            self.ai_response_callback,
+            10,
+        )
+
         self.get_logger().info("Orchestrator API Node has been started.")
 
 
@@ -275,13 +288,13 @@ class OrchestratorAPI(Node):
             slam_status = "running" if self.slam_manager.process and self.slam_manager.process.poll() is None else "stopped"
             nav2_status = "running" if self.nav2_manager.process and self.nav2_manager.process.poll() is None else "stopped"
             base_control_status = "running" if self.base_control_manager.process and self.base_control_manager.process.poll() is None else "stopped"
-            
+
             status_data = {
                 "slam_status": slam_status,
-                "nav2_status": nav2_status, 
+                "nav2_status": nav2_status,
                 "base_control_status": base_control_status
             }
-            
+
             return jsonify({"status": "success", "message": json.dumps(status_data)}), 200
 
         @self.app.route('/maps/save', methods=['POST'])
@@ -660,6 +673,36 @@ class OrchestratorAPI(Node):
 
                 data = {"map_name": location_data['map_name'], "location": location_data['location']}
                 response = requests.post(f"{base_url}/maps/locations/add", json=data, timeout=10)
+
+            elif action == "ai_status":
+                # Code 2 is for status request
+                self.get_logger().info("Received request for AI status")
+                ai_request_msg = OMAIRequest()
+                ai_request_msg.header.stamp = self.get_clock().now().to_msg()
+                ai_request_msg.request_id = msg.request_id
+                ai_request_msg.code = 2
+                self.ai_request_pub.publish(ai_request_msg)
+                return
+
+            elif action == "enable_ai":
+                # Code 1 is for enable AI
+                self.get_logger().info("Received request to enable AI")
+                ai_request_msg = OMAIRequest()
+                ai_request_msg.header.stamp = self.get_clock().now().to_msg()
+                ai_request_msg.request_id = msg.request_id
+                ai_request_msg.code = 1
+                self.ai_request_pub.publish(ai_request_msg)
+                return
+
+            elif action == "disable_ai":
+                # Code 0 is for disable AI
+                self.get_logger().info("Received request to disable AI")
+                ai_request_msg = OMAIRequest()
+                ai_request_msg.header.stamp = self.get_clock().now().to_msg()
+                ai_request_msg.request_id = msg.request_id
+                ai_request_msg.code = 0
+                self.ai_request_pub.publish(ai_request_msg)
+                return
 
             else:
                 self.get_logger().error(f"Unknown action: {action}")

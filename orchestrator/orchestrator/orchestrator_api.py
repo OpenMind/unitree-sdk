@@ -445,6 +445,24 @@ class OrchestratorAPI(Node):
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Failed to read locations: {str(e)}"}), 500
 
+    def ai_response_callback(self, msg: OMAIReponse):
+        """
+        Callback for AI response messages.
+
+        Parameters:
+        ----------
+        msg : OMAIReponse
+            The received AI response message.
+        """
+        response_msg = OMAPIResponse()
+        response_msg.header.stamp = self.get_clock().now().to_msg()
+        response_msg.request_id = msg.request_id
+        response_msg.code = msg.code
+        response_msg.status = msg.status
+        response_msg.message = ""
+
+        self.api_response_pub.publish(response_msg)
+
     def save_map(self, map_name: str, map_directory: Optional[str] = None) -> Dict[str, str]:
         """
         Save the current map using both slam_toolbox and standard ROS2 formats.

@@ -128,8 +128,8 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.53
-      yaw_goal_tolerance: 0.2
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.12
 
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
@@ -155,7 +155,7 @@ controller_server:
       linear_granularity: 0.05
       angular_granularity: 0.025
       transform_tolerance: 0.5
-      xy_goal_tolerance: 0.35
+      xy_goal_tolerance: 0.2
       trans_stopped_velocity: 0.1
       short_circuit_trajectory_evaluation: True
       stateful: True
@@ -250,7 +250,7 @@ global_costmap:
           data_type: "LaserScan"
           raytrace_max_range: 3.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 3.5
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"

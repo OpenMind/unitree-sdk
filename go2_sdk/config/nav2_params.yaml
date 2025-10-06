@@ -30,7 +30,7 @@ amcl:
     save_pose_rate: 0.5
     sigma_hit: 0.2
     tf_broadcast: True
-    transform_tolerance: 1.0
+    transform_tolerance: 0.5  # Reduced from 1.0
     update_min_a: 0.005
     update_min_d: 0.02
     z_hit: 0.85
@@ -38,8 +38,6 @@ amcl:
     z_rand: 0.05
     z_short: 0.15
     scan_topic: scan
-
-    # Initial pose parameters
     set_initial_pose: True
     initial_pose_x: 0.0
     initial_pose_y: 0.0
@@ -50,7 +48,7 @@ bt_navigator:
   ros__parameters:
     use_sim_time: False
     global_frame: map
-    transform_tolerance: 1.0
+    transform_tolerance: 0.5  # Reduced from 1.0
     robot_base_frame: base_link
     odom_topic: /odom
     bt_loop_duration: 10
@@ -58,8 +56,6 @@ bt_navigator:
     enable_groot_monitoring: True
     groot_zmq_publisher_port: 1666
     groot_zmq_server_port: 1667
-    #default_nav_to_pose_bt_xml: "/opt/ros/humble/share/nav2_bt_navigator/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
-    #default_nav_through_poses_bt_xml: "/opt/ros/humble/share/nav2_bt_navigator/behavior_trees/navigate_through_poses_w_replanning_and_recovery.xml"
     plugin_lib_names:
     - nav2_compute_path_to_pose_action_bt_node
     - nav2_compute_path_through_poses_action_bt_node
@@ -111,79 +107,120 @@ bt_navigator:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 5.0
+    controller_frequency: 30.0  # Increased from 5.0 for MPPI
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
     min_theta_velocity_threshold: 0.001
     failure_tolerance: 0.5
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
-    controller_plugins: ["FollowPath", "RecoveryController"]
+    controller_plugins: ["FollowPath"]
 
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.25
-      movement_time_allowance: 15.0
+      required_movement_radius: 0.3  # Increased slightly
+      movement_time_allowance: 20.0  # Increased from 15.0
 
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.12
-
-    FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
-      debug_trajectory_details: True
-      min_vel_x: -0.05
-      min_vel_y: 0.0
-      max_vel_x: 0.4
-      max_vel_y: 0.0
-      max_vel_theta: 1.5
-      min_speed_xy: 0.1
-      max_speed_xy: 0.4
-      min_speed_theta: 0.4
-      acc_lim_x: 2.0
-      acc_lim_y: 0.0
-      acc_lim_theta: 3.0
-      decel_lim_x: -2.5
-      decel_lim_y: 0.0
-      decel_lim_theta: -3.2
-      vx_samples: 35
-      vy_samples: 1
-      vtheta_samples: 25
-      sim_time: 2.0
-      linear_granularity: 0.05
-      angular_granularity: 0.025
-      transform_tolerance: 0.5
       xy_goal_tolerance: 0.2
-      trans_stopped_velocity: 0.1
-      short_circuit_trajectory_evaluation: True
-      stateful: True
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.2
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
+      yaw_goal_tolerance: 0.1  
 
-    RecoveryController:
-      plugin: "dwb_core::DWBLocalPlanner"
-      # robot_radius: 0.22
-      footprint: "[[0.3, 0.2], [0.3, -0.2], [-0.3, -0.2], [-0.3, 0.2]]"
-      min_vel_x: -0.05
-      max_vel_x: 0.26
-      max_vel_theta: 1.0
-      sim_time: 2.0
-      acc_lim_x: 2.5
-      acc_lim_theta: 3.2
-      BaseObstacle:
-        scale: 0.3
-      critics: ["BaseObstacle", "GoalDist"]
+    # MPPI Controller - optimized for Unitree Go2
+    FollowPath:
+      plugin: "nav2_mppi_controller::MPPIController"
+      time_steps: 56  # Prediction horizon steps
+      model_dt: 0.05  # Time between steps (50ms)
+      batch_size: 2000  # Number of trajectories to sample
+      vx_std: 0.2  # Std dev for forward velocity sampling
+      vy_std: 0.0  # No lateral movement for quadruped
+      wz_std: 0.4  # Std dev for rotational velocity sampling
+      vx_max: 0.4  # Max forward velocity
+      vx_min: -0.15  # Max backward velocity
+      vy_max: 0.0
+      wz_max: 1.2  # Max rotation rate
+      iteration_count: 1  # MPPI iterations per control cycle
+      prune_distance: 1.7  # Distance ahead to prune path
+      transform_tolerance: 0.3
+      temperature: 0.3  # Lower = more exploitation vs exploration
+      gamma: 0.015  # Discount factor
+      motion_model: "DiffDrive"  # Use DiffDrive for Go2
+      visualize: False  # Set to True for debugging
+      regenerate_noises: False
+      
+      # Cost function weights (tune these for your needs)
+      critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
+      
+      ConstraintCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 4.0
+      
+      GoalCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 5.0  # High weight for reaching goal
+        threshold_to_consider: 1.4
+      
+      GoalAngleCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 9.0  # Important for final orientation
+        threshold_to_consider: 0.5
+      
+      PreferForwardCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 5.0  # Penalize backward motion
+        threshold_to_consider: 0.5
+      
+      # Obstacle and path following
+      CostCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 3.81
+        critical_cost: 300.0
+        consider_footprint: True
+        collision_cost: 1000000.0
+        near_goal_distance: 0.5
+        trajectory_point_step: 2
+      
+      PathAlignCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 14.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 20
+        use_path_orientations: False
+      
+      PathFollowCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 5.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+      
+      PathAngleCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        mode: 0
+
+      # Noise generator settings
+      noise_generator_config:
+        default: 
+          time_steps: 56
+          batch_size: 2000
+          vx_std: 0.2
+          wz_std: 0.4
+          vx_mu: 0.0
+          wz_mu: 0.0
 
 local_costmap:
   local_costmap:
@@ -197,13 +234,13 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      # robot_radius: 0.22
       footprint: "[[0.3, 0.2], [0.3, -0.2], [-0.3, -0.2], [-0.3, 0.2]]"
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
 
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
+      
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -223,6 +260,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 1.5
         inflation_radius: 0.4
+      
       always_send_full_costmap: True
 
 global_costmap:
@@ -233,11 +271,11 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
-      # robot_radius: 0.22
       footprint: "[[0.3, 0.2], [0.3, -0.2], [-0.3, -0.2], [-0.3, 0.2]]"
       resolution: 0.1
       track_unknown_space: True
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -252,13 +290,16 @@ global_costmap:
           raytrace_min_range: 0.0
           obstacle_max_range: 3.5
           obstacle_min_range: 0.0
+      
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
+      
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.4
+      
       always_send_full_costmap: True
 
 map_server:
@@ -318,7 +359,7 @@ behavior_server:
       plugin: "nav2_behaviors/AssistedTeleop"
     global_frame: odom
     robot_base_frame: base_link
-    transform_tolerance: 1.0
+    transform_tolerance: 0.5
     use_sim_time: False
     simulate_ahead_time: 2.5
     max_rotational_vel: 1.0
@@ -346,8 +387,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.26, 0.0, 1.0]
-    min_velocity: [-0.05, 0.0, -1.0]
+    max_velocity: [0.4, 0.0, 1.2]  # Updated for MPPI limits
+    min_velocity: [-0.15, 0.0, -1.2]
     max_accel: [2.5, 0.0, 3.2]
     max_decel: [-2.5, 0.0, -3.2]
     odom_topic: "odom"

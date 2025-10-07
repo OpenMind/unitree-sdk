@@ -125,7 +125,7 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.2
-      yaw_goal_tolerance: 0.1  
+      yaw_goal_tolerance: 0.2  
 
     # MPPI Controller - optimized for Unitree Go2
     FollowPath:
@@ -166,13 +166,13 @@ controller_server:
       GoalAngleCritic:
         enabled: True
         cost_power: 1
-        cost_weight: 9.0  # Important for final orientation
+        cost_weight: 15.0  # Important for final orientation
         threshold_to_consider: 0.5
       
       PreferForwardCritic:
         enabled: True
         cost_power: 1
-        cost_weight: 5.0  # Penalize backward motion
+        cost_weight: 3.0  # Penalize backward motion
         threshold_to_consider: 0.5
       
       # Obstacle and path following
@@ -321,12 +321,16 @@ planner_server:
     transform_tolerance: 0.1
     use_sim_time: False
     planner_plugins: ["GridBased"]
+    # Using SmacPlanner2D for better orientation handling
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
+      plugin: "nav2_smac_planner/SmacPlanner2D"
       tolerance: 0.3
-      use_astar: True
+      downsample_costmap: False
+      downsampling_factor: 1
       allow_unknown: True
-      use_final_approach_orientation: True
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      smooth_path: True
 
 smoother_server:
   ros__parameters:

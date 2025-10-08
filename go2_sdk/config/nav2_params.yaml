@@ -124,8 +124,8 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.2
-      yaw_goal_tolerance: 0.2  
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25  
 
     # MPPI Controller - optimized for Unitree Go2
     FollowPath:
@@ -259,7 +259,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 1.5
-        inflation_radius: 0.4
+        inflation_radius: 0.3
       
       always_send_full_costmap: True
 
@@ -298,7 +298,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.4
+        inflation_radius: 0.3
       
       always_send_full_costmap: True
 

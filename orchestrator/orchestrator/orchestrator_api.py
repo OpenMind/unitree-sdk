@@ -10,9 +10,12 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from typing import Dict, Optional
 from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse
-from unitree_go.msg import LowState  
+from unitree_go.msg import LowState
 import requests
 from pydantic import BaseModel, Field
+import tf2_ros
+from tf2_ros import TransformException
+from datetime import datetime
 
 class PositionModel(BaseModel):
     x: float = Field(..., description="X coordinate")
@@ -156,6 +159,10 @@ class OrchestratorAPI(Node):
         self.charging_confirmed_time = None
         self.charging_confirmation_duration = 3.0  # Wait 3 seconds to confirm stable charging
 
+        # TF2 setup for getting robot pose
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
         self.app = Flask(__name__)
         CORS(self.app)
         self.register_routes()
@@ -238,6 +245,45 @@ class OrchestratorAPI(Node):
             if self.charging_confirmed_time is not None:
                 self.get_logger().info("Charging detection cancelled - current dropped")
                 self.charging_confirmed_time = None
+
+    def get_robot_pose_in_map(self):
+        """
+        Get the current robot pose in the map frame.
+        
+        Returns:
+        -------
+        dict or None
+            Dictionary with position and orientation, or None if transform fails.
+        """
+        try:
+            # Lookup transform from map to base_link
+            transform = self.tf_buffer.lookup_transform(
+                'map',
+                'base_link',
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=1.0)
+            )
+            
+            # Extract position and orientation
+            pose = {
+                "position": {
+                    "x": transform.transform.translation.x,
+                    "y": transform.transform.translation.y,
+                    "z": transform.transform.translation.z
+                },
+                "orientation": {
+                    "x": transform.transform.rotation.x,
+                    "y": transform.transform.rotation.y,
+                    "z": transform.transform.rotation.z,
+                    "w": transform.transform.rotation.w
+                }
+            }
+            
+            return pose
+            
+        except TransformException as e:
+            self.get_logger().error(f"Failed to get transform: {str(e)}")
+            return None
 
     def run_flask_app(self):
         """
@@ -601,6 +647,109 @@ class OrchestratorAPI(Node):
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Failed to read locations: {str(e)}"}), 500
 
+        @self.app.route('/maps/locations/add/slam', methods=['POST'])
+        def add_slam_location():
+            """
+            Save current robot position during SLAM mode.
+            Requires SLAM to be running.
+            """
+            # Check if SLAM is running
+            if not self.is_slam_running():
+                return jsonify({
+                    "status": "error", 
+                    "message": "SLAM must be running to save locations"
+                }), 400
+            
+            data = request.get_json(silent=True) or {}
+            
+            # Validate required fields
+            if 'map_name' not in data:
+                return jsonify({
+                    "status": "error", 
+                    "message": "map_name is required"
+                }), 400
+            
+            if 'label' not in data:
+                return jsonify({
+                    "status": "error", 
+                    "message": "label is required"
+                }), 400
+            
+            map_name = data['map_name']
+            label = data['label']
+            description = data.get('description', '')
+            
+            # Get current robot pose in map frame
+            pose = self.get_robot_pose_in_map()
+            if pose is None:
+                return jsonify({
+                    "status": "error", 
+                    "message": "Failed to get robot position from map frame"
+                }), 500
+            
+            # Generate timestamp
+            timestamp = datetime.now().isoformat()
+            
+            # Create location data
+            location = {
+                "name": label,
+                "description": description,
+                "timestamp": timestamp,
+                "pose": pose
+            }
+            
+            # Validate with LocationModel
+            try:
+                validated_location = LocationModel(**location)
+                location = validated_location.model_dump()
+            except Exception as e:
+                return jsonify({
+                    "status": "error", 
+                    "message": f"Invalid location data: {str(e)}"
+                }), 400
+            
+            # Create map directory if it doesn't exist
+            map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
+            locations_file = os.path.join(self.locations_directory, 'locations.json')
+            
+            os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
+            os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
+            
+            # Load existing locations for this map
+            existing_locations = {}
+            if os.path.exists(map_locations_file):
+                try:
+                    with open(map_locations_file, 'r') as f:
+                        existing_locations = json.load(f)
+                except Exception as e:
+                    self.get_logger().error(f"Failed to read existing locations: {str(e)}")
+            
+            # Add/update the new location
+            existing_locations[label] = location
+            
+            # Save to map-specific locations file
+            try:
+                with open(map_locations_file, 'w') as f:
+                    json.dump(existing_locations, f, indent=4)
+                
+                # Also update the global locations file
+                with open(locations_file, 'w') as f:
+                    json.dump(existing_locations, f, indent=4)
+                
+                self.get_logger().info(f"Saved location '{label}' at position ({pose['position']['x']:.2f}, {pose['position']['y']:.2f})")
+                
+                return jsonify({
+                    "status": "success", 
+                    "message": f"Location '{label}' saved successfully",
+                    "location": location
+                }), 200
+                
+            except Exception as e:
+                return jsonify({
+                    "status": "error", 
+                    "message": f"Failed to save location: {str(e)}"
+                }), 500
+
     def ai_response_callback(self, msg: OMAIReponse):
         """
         Callback for AI response messages.
@@ -859,6 +1008,21 @@ class OrchestratorAPI(Node):
 
                 data = {"map_name": location_data['map_name'], "location": location_data['location']}
                 response = requests.post(f"{base_url}/maps/locations/add", json=data, timeout=10)
+
+            elif action == "add_slam_location":
+                self.get_logger().info("Received request to add SLAM location")
+                try:
+                    location_data = json.loads(msg.parameters) if msg.parameters else {}
+                except json.JSONDecodeError:
+                    raise ValueError("Invalid JSON in parameters")
+                
+                if 'map_name' not in location_data:
+                    raise ValueError("map_name is required in location data")
+                
+                if 'label' not in location_data:
+                    raise ValueError("label is required in location data")
+                
+                response = requests.post(f"{base_url}/maps/locations/add/slam", json=location_data, timeout=10)
 
             elif action == "ai_status":
                 # Code 2 is for a status request

@@ -4,11 +4,13 @@ import json
 import os
 import signal
 import subprocess
+import time
 from rclpy.node import Node
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from typing import Dict, Optional
 from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse
+from unitree_go.msg import LowState  
 import requests
 from pydantic import BaseModel, Field
 
@@ -105,6 +107,18 @@ class ProcessManager:
                 except (ProcessLookupError, OSError):
                     return True
         return False
+    
+    def is_running(self) -> bool:
+        """
+        Check if the process is currently running.
+        
+        Returns:
+        -------
+        bool
+            True if process is running, False otherwise.
+        """
+        return self.process is not None and self.process.poll() is None
+
 
 class OrchestratorAPI(Node):
     """
@@ -117,6 +131,7 @@ class OrchestratorAPI(Node):
         self.base_control_manager = ProcessManager()
         self.slam_manager = ProcessManager()
         self.nav2_manager = ProcessManager()
+        self.charging_manager = ProcessManager()
 
         self.map_saver_publisher = self.create_publisher(MapStorage, '/om/map_storage', 10)
 
@@ -125,6 +140,21 @@ class OrchestratorAPI(Node):
 
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
         os.makedirs(self.locations_directory, mode=0o755, exist_ok=True)
+
+        # Subscribe to lowstate for charging detection
+        self.lowstate_sub = self.create_subscription(
+            LowState,
+            '/lf/lowstate',
+            self.lowstate_callback,
+            10
+        )
+        
+        # Charging state tracking
+        self.is_charging = False
+        self.battery_soc = 0.0
+        self.battery_current = 0.0
+        self.charging_confirmed_time = None
+        self.charging_confirmation_duration = 3.0  # Wait 3 seconds to confirm stable charging
 
         self.app = Flask(__name__)
         CORS(self.app)
@@ -161,6 +191,53 @@ class OrchestratorAPI(Node):
 
         self.get_logger().info("Orchestrator API Node has been started.")
 
+    def lowstate_callback(self, msg):
+        """
+        Monitor BMS state for charging detection.
+        
+        Parameters:
+        ----------
+        msg : LowState
+            The lowstate message containing BMS data.
+        """
+        bms = msg.bms_state
+        self.battery_soc = bms.soc
+        self.battery_current = bms.current
+        
+        # Detect charging based on current (positive = charging)
+        current_is_charging = bms.current > 0.3  # 0.3 mA threshold to avoid noise
+        
+        # Handle charging state transition
+        if current_is_charging and not self.is_charging:
+            # Just started charging - begin confirmation period
+            if self.charging_confirmed_time is None:
+                self.charging_confirmed_time = time.time()
+                self.get_logger().info(f"⚡ Charging current detected ({bms.current} mA), confirming...")
+            else:
+                # Check if we've been charging long enough to confirm
+                elapsed = time.time() - self.charging_confirmed_time
+                if elapsed >= self.charging_confirmation_duration:
+                    self.is_charging = True
+                    self.get_logger().info(f"🔋 Charging CONFIRMED after {elapsed:.1f}s - docking successful!")
+                    
+                    # Stop the charging dock process since we're now charging
+                    if self.charging_manager.is_running():
+                        self.get_logger().info("Stopping charging dock process - robot is now charging")
+                        self.charging_manager.stop()
+                    
+                    self.charging_confirmed_time = None
+        
+        elif not current_is_charging and self.is_charging:
+            # Stopped charging
+            self.is_charging = False
+            self.charging_confirmed_time = None
+            self.get_logger().info("🔌 Charging stopped")
+        
+        elif not current_is_charging:
+            # Not charging and confirmation timer was running - reset it
+            if self.charging_confirmed_time is not None:
+                self.get_logger().info("Charging detection cancelled - current dropped")
+                self.charging_confirmed_time = None
 
     def run_flask_app(self):
         """
@@ -181,7 +258,7 @@ class OrchestratorAPI(Node):
             if self.is_slam_running() or self.is_nav2_running():
                 return jsonify({"status": "error", "message": "Cannot start base control while SLAM or Nav2 is running"}), 400
 
-            data = request.json if request.json else {}
+            data = request.get_json(silent=True) or {}
             launch_file = data.get('launch_file', 'base_control_launch.py')
 
             if self.base_control_manager.start(launch_file):
@@ -207,7 +284,7 @@ class OrchestratorAPI(Node):
             if self.nav2_manager.process and self.nav2_manager.process.poll() is None:
                 return jsonify({"status": "Nav2 is running, stop it before starting SLAM"}), 400
 
-            data = request.json
+            data = request.get_json(silent=True) or {}
             launch_file = data.get('launch_file', 'slam_launch.py')
             map_yaml = data.get('map_yaml', None)
             if self.slam_manager.start(launch_file, map_yaml):
@@ -235,7 +312,7 @@ class OrchestratorAPI(Node):
             if self.slam_manager.process and self.slam_manager.process.poll() is None:
                 return jsonify({"status": "error", "message": "SLAM is running, stop it before starting Nav2"}), 400
 
-            data = request.json
+            data = request.get_json(silent=True) or {}
             launch_file = data.get('launch_file', 'nav2_launch.py')
             map_name = data.get('map_name', None)
             if not map_name:
@@ -280,6 +357,80 @@ class OrchestratorAPI(Node):
             else:
                 return jsonify({"status": "error", "message": "Nav2 is not running"}), 400
 
+        @self.app.route('/charging/dock', methods=['POST'])
+        def start_charging_dock():
+            """
+            Start autonomous docking sequence to charger.
+            Requires Nav2 to be running.
+            """
+            # Check if Nav2 is running (prerequisite)
+            if not self.is_nav2_running():
+                return jsonify({
+                    "status": "error", 
+                    "message": "Nav2 must be running to start charging dock. Please start Nav2 first."
+                }), 400
+            
+            # Check if charging process is already running
+            if self.charging_manager.is_running():
+                return jsonify({
+                    "status": "error", 
+                    "message": "Charging dock process is already running"
+                }), 400
+            
+            # Check if already charging
+            if self.is_charging:
+                return jsonify({
+                    "status": "error", 
+                    "message": "Robot is already charging"
+                }), 400
+            
+            # Start the charging dock process
+            data = request.get_json(silent=True) or {}
+            launch_file = data.get('launch_file', 'go2_charge.launch.py')
+            
+            if self.charging_manager.start(launch_file):
+                self.get_logger().info("Starting autonomous docking to charger")
+                return jsonify({
+                    "status": "success", 
+                    "message": "Charging dock process started"
+                }), 200
+            else:
+                return jsonify({
+                    "status": "error", 
+                    "message": "Failed to start charging dock process"
+                }), 500
+
+        @self.app.route('/charging/stop', methods=['POST'])
+        def stop_charging_dock():
+            """
+            Stop the charging dock process.
+            """
+            if self.charging_manager.stop():
+                self.charging_confirmed_time = None  # Reset confirmation timer
+                self.get_logger().info("Charging dock process stopped")
+                return jsonify({
+                    "status": "success", 
+                    "message": "Charging dock process stopped"
+                }), 200
+            else:
+                return jsonify({
+                    "status": "error", 
+                    "message": "Charging dock process is not running"
+                }), 400
+
+        @self.app.route('/charging/status', methods=['GET'])
+        def charging_status():
+            """
+            Get current charging and docking status.
+            """
+            return jsonify({
+                "is_charging": self.is_charging,
+                "battery_soc": self.battery_soc,
+                "battery_current": self.battery_current,
+                "dock_process_running": self.charging_manager.is_running(),
+                "charging_confirmation_pending": self.charging_confirmed_time is not None
+            }), 200
+
         @self.app.route('/status', methods=['GET'])
         def status():
             """
@@ -288,11 +439,16 @@ class OrchestratorAPI(Node):
             slam_status = "running" if self.slam_manager.process and self.slam_manager.process.poll() is None else "stopped"
             nav2_status = "running" if self.nav2_manager.process and self.nav2_manager.process.poll() is None else "stopped"
             base_control_status = "running" if self.base_control_manager.process and self.base_control_manager.process.poll() is None else "stopped"
+            charging_dock_status = "running" if self.charging_manager.is_running() else "stopped"
 
             status_data = {
                 "slam_status": slam_status,
                 "nav2_status": nav2_status,
-                "base_control_status": base_control_status
+                "base_control_status": base_control_status,
+                "charging_dock_status": charging_dock_status,
+                "is_charging": self.is_charging,
+                "battery_soc": self.battery_soc,
+                "battery_current": self.battery_current
             }
 
             return jsonify({"status": "success", "message": json.dumps(status_data)}), 200
@@ -305,7 +461,7 @@ class OrchestratorAPI(Node):
             if not (self.slam_manager.process and self.slam_manager.process.poll() is None):
                 return jsonify({"status": "error", "message": "SLAM is not running"}), 400
 
-            data = request.json
+            data = request.get_json(silent=True) or {}
             if not data or 'map_name' not in data:
                 return jsonify({"status": "error", "message": "map_name is required"}), 400
 
@@ -357,7 +513,7 @@ class OrchestratorAPI(Node):
             """
             Delete a specified map directory.
             """
-            data = request.json
+            data = request.get_json(silent=True) or {}
             if not data or 'map_name' not in data:
                 return jsonify({"status": "error", "message": "map_name is required"}), 400
 
@@ -385,7 +541,7 @@ class OrchestratorAPI(Node):
             """
             Add a single location to the existing map locations JSON file.
             """
-            data = request.json
+            data = request.get_json(silent=True) or {}
             if not data or 'location' not in data:
                 return jsonify({"status": "error", "message": "location data is required"}), 400
 
@@ -654,6 +810,18 @@ class OrchestratorAPI(Node):
                 self.get_logger().info("Received request to stop Nav2")
                 response = requests.post(f"{base_url}/stop/nav2", json={}, timeout=10)
 
+            elif action == "start_charging_dock":
+                self.get_logger().info("Received request to start charging dock")
+                response = requests.post(f"{base_url}/charging/dock", json={}, timeout=10)
+
+            elif action == "stop_charging_dock":
+                self.get_logger().info("Received request to stop charging dock")
+                response = requests.post(f"{base_url}/charging/stop", json={}, timeout=10)
+
+            elif action == "charging_status":
+                self.get_logger().info("Received request for charging status")
+                response = requests.get(f"{base_url}/charging/status", timeout=10)
+
             elif action == "save_map":
                 self.get_logger().info("Received request to save map")
                 data = {"map_name": msg.parameters} if msg.parameters else {}
@@ -728,7 +896,7 @@ class OrchestratorAPI(Node):
                 self.get_logger().error(f"Unknown action: {action}")
                 response_msg = OMAPIResponse()
                 response_msg.header.stamp = self.get_clock().now().to_msg()
-                ai_request_msg.header.frame_id = "om_api"
+                response_msg.header.frame_id = "om_api"
                 response_msg.request_id = msg.request_id
                 response_msg.code = 400
                 response_msg.status = "error"
@@ -749,9 +917,9 @@ class OrchestratorAPI(Node):
             self.get_logger().error(f"HTTP request failed: {str(e)}")
             response_msg = OMAPIResponse()
             response_msg.request_id = msg.request_id
-            response_msg.code = response.status_code
+            response_msg.code = 500
             response_msg.status = "error"
-            response_msg.message = response.text
+            response_msg.message = str(e)
             self.api_response_pub.publish(response_msg)
 
 def main(args=None):
@@ -771,6 +939,7 @@ def main(args=None):
         orchestrator_api.base_control_manager.stop()
         orchestrator_api.slam_manager.stop()
         orchestrator_api.nav2_manager.stop()
+        orchestrator_api.charging_manager.stop()
         orchestrator_api.destroy_node()
         rclpy.shutdown()
 

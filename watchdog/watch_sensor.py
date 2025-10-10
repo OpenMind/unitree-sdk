@@ -22,12 +22,12 @@ class WatchSensor(Node):
         self.last_zenoh_time = time.time()
         self.last_rtsp_time = time.time()
         self.timeout_duration = float(os.getenv('SENSOR_TIMEOUT_DURATION', '30.0'))
-        self.rtsp_url = os.getenv('RTSP_URL', 'rtsp://localhost:8554/live')
+        self.rtsp_url = os.getenv('RTSP_URL', 'rtsp://localhost:8554/top_camera')
         self.rtsp_decode_format = os.getenv('RTSP_DECODE_FORMAT', 'H264')
 
         self.sensor_service_name = os.getenv('SENSOR_SERVICE_NAME', 'om1_sensor')
         self.zenoh_service_name = os.getenv('ZENOH_SERVICE_NAME', 'zenoh_bridge')
-        self.mediamtx_service_name = os.getenv('MEDIAMTX_SERVICE_NAME', 'mediamtx')
+        self.video_processor_service_name = os.getenv('VIDEO_PROCESSOR_SERVICE_NAME', 'om1_video_processor')
 
         try:
             self.docker_client = docker.from_env()
@@ -189,8 +189,8 @@ class WatchSensor(Node):
                     self.last_zenoh_time = time.time()
 
                 if rtsp_timeout:
-                    self.get_logger().warn(f"RTSP stream not responding for {self.timeout_duration}s. Restarting MediaMTX container...")
-                    self.restart_container(self.mediamtx_service_name)
+                    self.get_logger().warn(f"RTSP stream not responding for {self.timeout_duration}s. Restarting video processor container...")
+                    self.restart_container(self.video_processor_service_name)
                     self.last_rtsp_time = time.time()
 
                 time.sleep(1.0)

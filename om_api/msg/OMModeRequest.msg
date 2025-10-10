@@ -1,4 +1,4 @@
 std_msgs/Header header
 string request_id
-int32 code
+int8 code
 string mode

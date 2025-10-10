@@ -1099,10 +1099,10 @@ class OrchestratorAPI(Node):
                 self.mode_request_pub.publish(mode_request_msg)
                 return
 
-            elif action == "set_mode":
+            elif action == "swicth_mode":
                 # Code 0 is for setting mode, parameters should contain the mode string
                 if not msg.parameters:
-                    raise ValueError("Mode parameter is required for set_mode action")
+                    raise ValueError("Mode parameter is required for swicth_mode action")
                 self.get_logger().info(f"Received request to set mode to {msg.parameters}")
                 mode_request_msg = OMModeRequest()
                 mode_request_msg.header.stamp = self.get_clock().now().to_msg()

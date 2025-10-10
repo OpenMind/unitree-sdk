@@ -85,10 +85,11 @@ class Go2CameraNode(Node):
             "-vsync", "cfr",
 
             # --- Output ---
-            "-f", "rtsp",
-            "-rtsp_transport", "tcp",
-            f"rtsp://api-video-ingest.openmind.org:8554/front_camera/{self.api_key_id}"
-            f"?api_key={self.api_key}"
+            "-f", "tee",
+            "-map", "0:v",
+            "[f=rtsp:rtsp_transport=tcp]rtsp://localhost:8554/front_camera"
+            "|"
+            f"[f=rtsp:rtsp_transport=tcp]rtsp://api-video-ingest.openmind.org:8554/front_camera/{self.api_key_id}?api_key={self.api_key}"
         ]
 
         try:

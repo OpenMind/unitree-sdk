@@ -84,7 +84,8 @@ class D435RGBStream(Node):
             self.ffmpeg_process = subprocess.Popen(
                 ffmpeg_cmd,
                 stdin=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                bufsize=self.width * self.height * 3 * 3,
             )
             self.get_logger().info("FFmpeg streaming process started")
         except Exception as e:
@@ -132,6 +133,11 @@ class D435RGBStream(Node):
             if frame.shape[0] != self.height or frame.shape[1] != self.width:
                 frame = cv2.resize(frame, (self.width, self.height))
 
+                if not self._is_process_healthy():
+                    self.get_logger().warning("FFmpeg process not healthy, restarting...")
+                    self.restart_ffmpeg()
+                    return
+
             if self.ffmpeg_process and self.ffmpeg_process.stdin:
                 try:
                     self.ffmpeg_process.stdin.write(frame.tobytes())
@@ -166,6 +172,12 @@ class D435RGBStream(Node):
                     self.get_logger().info(f"FPS changed significantly, restarting FFmpeg stream: {self.current_fps:.2f} -> {calculated_fps:.2f}")
                     self.current_fps = calculated_fps
                     self.restart_ffmpeg()
+
+    def _is_process_healthy(self):
+        """
+        Check if the process is running and available.
+        """
+        return self.ffmpeg_process is not None and self.ffmpeg_process.poll() is None
 
     def restart_ffmpeg(self):
         """

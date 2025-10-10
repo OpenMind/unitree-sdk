@@ -9,6 +9,7 @@ from nav_msgs.msg import OccupancyGrid
 import json
 
 from .ws_client import WebSocketClient
+from .ws_server import WebSocketServer
 
 env = os.getenv('ENV', 'production')
 
@@ -74,7 +75,8 @@ class OrchestratorCloud(Node):
 
         self.pose_ws = WebSocketClient(self.pose_ws_url, self.get_logger()) if self.pose_ws_url else None
         self.map_ws = WebSocketClient(self.map_ws_url, self.get_logger()) if self.map_ws_url else None
-        self.api_ws = WebSocketClient(self.api_ws_url, self.get_logger()) if self.api_ws_url else None
+        self.local_api_ws = WebSocketServer(self.get_logger(), host='0.0.0.0', port=6123)
+        self.cloud_api_ws = WebSocketClient(self.api_ws_url, self.get_logger()) if self.api_ws_url else None
 
         if self.pose_ws:
             self.pose_ws.start()
@@ -82,9 +84,14 @@ class OrchestratorCloud(Node):
         if self.map_ws:
             self.map_ws.start()
 
-        if self.api_ws:
-            self.api_ws.start()
-            self.api_ws.message_callback = self.api_request_callback
+        if self.local_api_ws:
+            self.local_api_ws.start()
+            self.get_logger().info(f"Local API WebSocket server started on {self.local_api_ws.host}:{self.local_api_ws.port}")
+            self.local_api_ws.message_callback = self.api_request_callback
+
+        if self.cloud_api_ws:
+            self.cloud_api_ws.start()
+            self.cloud_api_ws.message_callback = self.api_request_callback
 
         self.get_logger().info("Orchestrator Cloud Node Initialized")
 
@@ -281,9 +288,16 @@ class OrchestratorCloud(Node):
             "message": response.message
         }
 
-        if self.api_ws and self.api_ws.connected:
+        if self.local_api_ws:
             try:
-                self.api_ws.send_message(json.dumps(response_data))
+                self.local_api_ws.broadcast(json.dumps(response_data))
+                self.get_logger().info("API response sent to all local clients.")
+            except Exception as e:
+                self.get_logger().error(f"Failed to send API response to all local clients: {e}")
+
+        if self.cloud_api_ws and self.cloud_api_ws.connected:
+            try:
+                self.cloud_api_ws.send_message(json.dumps(response_data))
                 self.get_logger().info("API response sent.")
             except Exception as e:
                 self.get_logger().error(f"Failed to send API response: {e}")

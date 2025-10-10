@@ -27,6 +27,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/OMAPIResponse.msg"
   "msg/OMAIRequest.msg"
   "msg/OMAIReponse.msg"
+  "msg/OMModeRequest.msg"
+  "msg/OMModeReponse.msg"
   DEPENDENCIES std_msgs
 )
 

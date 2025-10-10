@@ -17,6 +17,7 @@ def generate_launch_description():
     angle_compensate = LaunchConfiguration('angle_compensate', default=EnvironmentVariable('ANGLE_COMPENSATE', default_value='true'))
     scan_mode = LaunchConfiguration('scan_mode', default=EnvironmentVariable('SCAN_MODE', default_value='Sensitivity'))
     go2_camera_stream_enable = LaunchConfiguration('go2_camera_stream_enable', default=EnvironmentVariable('GO2_CAMERA_STREAM_ENABLE', default_value='true'))
+    d435_camera_stream_enable = LaunchConfiguration('d435_camera_stream_enable', default=EnvironmentVariable('D435_CAMERA_STREAM_ENABLE', default_value='true'))
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -59,6 +60,11 @@ def generate_launch_description():
             default_value=go2_camera_stream_enable,
             description='Enable or disable the go2_camera_stream node (can be set via GO2_CAMERA_STREAM_ENABLE environment variable)'),
 
+        DeclareLaunchArgument(
+            'd435_camera_stream_enable',
+            default_value=d435_camera_stream_enable,
+            description='Enable or disable the d435_camera_stream node (can be set via D435_CAMERA_STREAM_ENABLE environment variable)'),
+
         Node(
             package='rplidar_ros',
             executable='rplidar_node',
@@ -81,13 +87,14 @@ def generate_launch_description():
             executable='realsense2_camera_node',
             name='realsense2_camera_node',
             parameters=[{
-                'enable_color': False,
+                'enable_color': True,
                 'enable_depth': True,
                 'enable_infra1': False,
                 'enable_infra2': False,
                 'enable_gyro': False,
                 'enable_accel': False,
                 'unite_imu_method': 0,
+                'rgb_camera.color_profile': '424x240x15',
                 'depth_module.depth_profile': '480x270x15'
             }],
             output='screen',
@@ -121,5 +128,15 @@ def generate_launch_description():
             respawn=True,
             respawn_delay=2.0,
             condition=IfCondition(go2_camera_stream_enable)
+        ),
+
+        Node(
+            package='go2_sdk',
+            executable='d435_camera_stream',
+            name='d435_camera_stream',
+            output='screen',
+            respawn=True,
+            respawn_delay=2.0,
+            condition=IfCondition(d435_camera_stream_enable)
         )
     ])

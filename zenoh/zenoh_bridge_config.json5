@@ -29,6 +29,8 @@
                       ".*/om/pose",
                       ".*/om/ai/request",
                       ".*/om/ai/response",
+                      ".*/om/mode/request",
+                      ".*/om/mode/response",
 
                       // Motion control
                       ".*/cmd_vel",
@@ -129,6 +131,8 @@
                       ".*/om/pose",
                       ".*/om/ai/request",
                       ".*/om/ai/response",
+                      ".*/om/mode/request",
+                      ".*/om/mode/response",
 
                       // Motion control
                       ".*/cmd_vel",

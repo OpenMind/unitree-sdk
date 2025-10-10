@@ -9,7 +9,7 @@ from rclpy.node import Node
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from typing import Dict, Optional
-from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse, OMModeRequest, OMModeReponse
 from unitree_go.msg import LowState
 import requests
 from pydantic import BaseModel, Field
@@ -110,11 +110,11 @@ class ProcessManager:
                 except (ProcessLookupError, OSError):
                     return True
         return False
-    
+
     def is_running(self) -> bool:
         """
         Check if the process is currently running.
-        
+
         Returns:
         -------
         bool
@@ -151,7 +151,7 @@ class OrchestratorAPI(Node):
             self.lowstate_callback,
             10
         )
-        
+
         # Charging state tracking
         self.is_charging = False
         self.battery_soc = 0.0
@@ -196,12 +196,25 @@ class OrchestratorAPI(Node):
             10,
         )
 
+        self.mode_request_pub = self.create_publisher(
+            OMModeRequest,
+            '/om/mode/request',
+            10,
+        )
+
+        self.mode_request_sub = self.create_subscription(
+            OMModeReponse,
+            '/om/mode/response',
+            self.mode_response_callback,
+            10,
+        )
+
         self.get_logger().info("Orchestrator API Node has been started.")
 
     def lowstate_callback(self, msg):
         """
         Monitor BMS state for charging detection.
-        
+
         Parameters:
         ----------
         msg : LowState
@@ -210,10 +223,10 @@ class OrchestratorAPI(Node):
         bms = msg.bms_state
         self.battery_soc = bms.soc
         self.battery_current = bms.current
-        
+
         # Detect charging based on current (positive = charging)
         current_is_charging = bms.current > 0.3  # 0.3 mA threshold to avoid noise
-        
+
         # Handle charging state transition
         if current_is_charging and not self.is_charging:
             # Just started charging - begin confirmation period
@@ -226,20 +239,20 @@ class OrchestratorAPI(Node):
                 if elapsed >= self.charging_confirmation_duration:
                     self.is_charging = True
                     self.get_logger().info(f"🔋 Charging CONFIRMED after {elapsed:.1f}s - docking successful!")
-                    
+
                     # Stop the charging dock process since we're now charging
                     if self.charging_manager.is_running():
                         self.get_logger().info("Stopping charging dock process - robot is now charging")
                         self.charging_manager.stop()
-                    
+
                     self.charging_confirmed_time = None
-        
+
         elif not current_is_charging and self.is_charging:
             # Stopped charging
             self.is_charging = False
             self.charging_confirmed_time = None
             self.get_logger().info("🔌 Charging stopped")
-        
+
         elif not current_is_charging:
             # Not charging and confirmation timer was running - reset it
             if self.charging_confirmed_time is not None:
@@ -249,7 +262,7 @@ class OrchestratorAPI(Node):
     def get_robot_pose_in_map(self):
         """
         Get the current robot pose in the map frame.
-        
+
         Returns:
         -------
         dict or None
@@ -263,7 +276,7 @@ class OrchestratorAPI(Node):
                 rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=1.0)
             )
-            
+
             # Extract position and orientation
             pose = {
                 "position": {
@@ -278,9 +291,9 @@ class OrchestratorAPI(Node):
                     "w": transform.transform.rotation.w
                 }
             }
-            
+
             return pose
-            
+
         except TransformException as e:
             self.get_logger().error(f"Failed to get transform: {str(e)}")
             return None
@@ -412,37 +425,37 @@ class OrchestratorAPI(Node):
             # Check if Nav2 is running (prerequisite)
             if not self.is_nav2_running():
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Nav2 must be running to start charging dock. Please start Nav2 first."
                 }), 400
-            
+
             # Check if charging process is already running
             if self.charging_manager.is_running():
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Charging dock process is already running"
                 }), 400
-            
+
             # Check if already charging
             if self.is_charging:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Robot is already charging"
                 }), 400
-            
+
             # Start the charging dock process
             data = request.get_json(silent=True) or {}
             launch_file = data.get('launch_file', 'go2_charge.launch.py')
-            
+
             if self.charging_manager.start(launch_file):
                 self.get_logger().info("Starting autonomous docking to charger")
                 return jsonify({
-                    "status": "success", 
+                    "status": "success",
                     "message": "Charging dock process started"
                 }), 200
             else:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Failed to start charging dock process"
                 }), 500
 
@@ -455,12 +468,12 @@ class OrchestratorAPI(Node):
                 self.charging_confirmed_time = None  # Reset confirmation timer
                 self.get_logger().info("Charging dock process stopped")
                 return jsonify({
-                    "status": "success", 
+                    "status": "success",
                     "message": "Charging dock process stopped"
                 }), 200
             else:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Charging dock process is not running"
                 }), 400
 
@@ -656,40 +669,40 @@ class OrchestratorAPI(Node):
             # Check if SLAM is running
             if not self.is_slam_running():
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "SLAM must be running to save locations"
                 }), 400
-            
+
             data = request.get_json(silent=True) or {}
-            
+
             # Validate required fields
             if 'map_name' not in data:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "map_name is required"
                 }), 400
-            
+
             if 'label' not in data:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "label is required"
                 }), 400
-            
+
             map_name = data['map_name']
             label = data['label']
             description = data.get('description', '')
-            
+
             # Get current robot pose in map frame
             pose = self.get_robot_pose_in_map()
             if pose is None:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Failed to get robot position from map frame"
                 }), 500
-            
+
             # Generate timestamp
             timestamp = datetime.now().isoformat()
-            
+
             # Create location data
             location = {
                 "name": label,
@@ -697,24 +710,24 @@ class OrchestratorAPI(Node):
                 "timestamp": timestamp,
                 "pose": pose
             }
-            
+
             # Validate with LocationModel
             try:
                 validated_location = LocationModel(**location)
                 location = validated_location.model_dump()
             except Exception as e:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": f"Invalid location data: {str(e)}"
                 }), 400
-            
+
             # Create map directory if it doesn't exist
             map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
             locations_file = os.path.join(self.locations_directory, 'locations.json')
-            
+
             os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
             os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
-            
+
             # Load existing locations for this map
             existing_locations = {}
             if os.path.exists(map_locations_file):
@@ -723,30 +736,30 @@ class OrchestratorAPI(Node):
                         existing_locations = json.load(f)
                 except Exception as e:
                     self.get_logger().error(f"Failed to read existing locations: {str(e)}")
-            
+
             # Add/update the new location
             existing_locations[label] = location
-            
+
             # Save to map-specific locations file
             try:
                 with open(map_locations_file, 'w') as f:
                     json.dump(existing_locations, f, indent=4)
-                
+
                 # Also update the global locations file
                 with open(locations_file, 'w') as f:
                     json.dump(existing_locations, f, indent=4)
-                
+
                 self.get_logger().info(f"Saved location '{label}' at position ({pose['position']['x']:.2f}, {pose['position']['y']:.2f})")
-                
+
                 return jsonify({
-                    "status": "success", 
+                    "status": "success",
                     "message": f"Location '{label}' saved successfully",
                     "location": location
                 }), 200
-                
+
             except Exception as e:
                 return jsonify({
-                    "status": "error", 
+                    "status": "error",
                     "message": f"Failed to save location: {str(e)}"
                 }), 500
 
@@ -765,6 +778,24 @@ class OrchestratorAPI(Node):
         response_msg.code = msg.code
         response_msg.status = msg.status
         response_msg.message = msg.status
+
+        self.api_response_pub.publish(response_msg)
+
+    def mode_response_callback(self, msg: OMModeReponse):
+        """
+        Callback for mode response messages.
+
+        Parameters:
+        ----------
+        msg : OMModeReponse
+            The received mode response message.
+        """
+        response_msg = OMAPIResponse()
+        response_msg.header.stamp = self.get_clock().now().to_msg()
+        response_msg.request_id = msg.request_id
+        response_msg.code = msg.code
+        response_msg.status = msg.current_mode
+        response_msg.message = msg.message
 
         self.api_response_pub.publish(response_msg)
 
@@ -1015,13 +1046,13 @@ class OrchestratorAPI(Node):
                     location_data = json.loads(msg.parameters) if msg.parameters else {}
                 except json.JSONDecodeError:
                     raise ValueError("Invalid JSON in parameters")
-                
+
                 if 'map_name' not in location_data:
                     raise ValueError("map_name is required in location data")
-                
+
                 if 'label' not in location_data:
                     raise ValueError("label is required in location data")
-                
+
                 response = requests.post(f"{base_url}/maps/locations/add/slam", json=location_data, timeout=10)
 
             elif action == "ai_status":
@@ -1054,6 +1085,32 @@ class OrchestratorAPI(Node):
                 ai_request_msg.request_id = msg.request_id
                 ai_request_msg.code = 0
                 self.ai_request_pub.publish(ai_request_msg)
+                return
+
+            elif action == "get_mode":
+                # Code 1 is for getting current mode
+                self.get_logger().info("Received request to get current mode")
+                mode_request_msg = OMModeRequest()
+                mode_request_msg.header.stamp = self.get_clock().now().to_msg()
+                mode_request_msg.header.frame_id = "om_api"
+                mode_request_msg.request_id = msg.request_id
+                mode_request_msg.code = 1
+                mode_request_msg.mode = ""
+                self.mode_request_pub.publish(mode_request_msg)
+                return
+
+            elif action == "set_mode":
+                # Code 0 is for setting mode, parameters should contain the mode string
+                if not msg.parameters:
+                    raise ValueError("Mode parameter is required for set_mode action")
+                self.get_logger().info(f"Received request to set mode to {msg.parameters}")
+                mode_request_msg = OMModeRequest()
+                mode_request_msg.header.stamp = self.get_clock().now().to_msg()
+                mode_request_msg.header.frame_id = "om_api"
+                mode_request_msg.request_id = msg.request_id
+                mode_request_msg.code = 0
+                mode_request_msg.mode = msg.parameters
+                self.mode_request_pub.publish(mode_request_msg)
                 return
 
             else:

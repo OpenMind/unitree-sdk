@@ -60,6 +60,8 @@ services:
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
+      - OM_API_KEY=${OM_API_KEY:-}
+      - OM_API_KEY_ID=${OM_API_KEY_ID:-}
     command: "ros2 launch go2_sdk sensor_launch.py"
     volumes:
       - /dev:/dev

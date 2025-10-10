@@ -28,7 +28,8 @@ RUN apt-get update && apt-get install -y \
     ros-humble-realsense2-camera \
     libportaudio2 \
     x11-apps \
-    libsm6
+    libsm6 \
+    ffmpeg
 
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 \
     && update-alternatives --set python3 /usr/bin/python3.10

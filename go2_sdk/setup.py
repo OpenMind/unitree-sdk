@@ -35,6 +35,7 @@ setup(
             'om_path = go2_sdk.om_path:main',
             'go2_sport_action = go2_sdk.go2_sport_action:main',
             'crsf_controller = go2_sdk.crsf_controller:main',
+            'go2_camera_stream = go2_sdk.go2_camera_stream:main',
         ],
     },
 )

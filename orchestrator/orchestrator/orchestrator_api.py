@@ -1137,8 +1137,18 @@ class OrchestratorAPI(Node):
                 twist.linear.y = float(vy)
                 twist.angular.z = float(vyaw)
 
-                self.remote_control_pub.publish(twist)
+                self.move_cmd_pub.publish(twist)
                 self.get_logger().info(f"Published remote control command: vx={vx}, vy={vy}, vyaw={vyaw}")
+
+                response_msg = OMAPIResponse()
+                response_msg.header.stamp = self.get_clock().now().to_msg()
+                response_msg.header.frame_id = "om_api"
+                response_msg.request_id = msg.request_id
+                response_msg.code = 200
+                response_msg.status = "success"
+                response_msg.message = f"Remote control command published: vx={vx}, vy={vy}, vyaw={vyaw}"
+                self.api_response_pub.publish(response_msg)
+                return
 
             else:
                 self.get_logger().error(f"Unknown action: {action}")

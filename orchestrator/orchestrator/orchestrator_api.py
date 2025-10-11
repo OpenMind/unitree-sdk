@@ -15,6 +15,7 @@ import requests
 from pydantic import BaseModel, Field
 import tf2_ros
 from tf2_ros import TransformException
+from geometry_msgs.msg import Twist
 from datetime import datetime
 
 class PositionModel(BaseModel):
@@ -206,6 +207,12 @@ class OrchestratorAPI(Node):
             OMModeReponse,
             '/om/mode/response',
             self.mode_response_callback,
+            10,
+        )
+
+        self.move_cmd_pub = self.create_publisher(
+            Twist,
+            '/cmd_vel',
             10,
         )
 
@@ -1112,6 +1119,26 @@ class OrchestratorAPI(Node):
                 mode_request_msg.mode = msg.parameters
                 self.mode_request_pub.publish(mode_request_msg)
                 return
+
+            elif action == "remote_control":
+                if not msg.parameters:
+                    raise ValueError("Command parameter is required for remote_control action")
+                try:
+                    speed_parameters = json.loads(msg.parameters) if msg.parameters else {}
+                except json.JSONDecodeError:
+                    raise ValueError("Invalid JSON in parameters")
+
+                vx = speed_parameters.get("vx", 0.0)
+                vy = speed_parameters.get("vy", 0.0)
+                vyaw = speed_parameters.get("vyaw", 0.0)
+
+                twist = Twist()
+                twist.linear.x = float(vx)
+                twist.linear.y = float(vy)
+                twist.angular.z = float(vyaw)
+
+                self.remote_control_pub.publish(twist)
+                self.get_logger().info(f"Published remote control command: vx={vx}, vy={vy}, vyaw={vyaw}")
 
             else:
                 self.get_logger().error(f"Unknown action: {action}")

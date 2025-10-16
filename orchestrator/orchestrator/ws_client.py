@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 from queue import Queue, Empty
 from typing import Optional, Callable
 
@@ -52,12 +53,14 @@ class WebSocketClient:
         while self.running:
             try:
                 if self.connected and self.websocket:
-                    message = self.message_queue.get_nowait()
+                    message = self.message_queue.get(timeout=0.1)
                     try:
                         self.websocket.send(message)
                     except Exception as e:
                         self.logger.error(f"Failed to send message: {e}")
                         self.message_queue.put(message)
+                else:
+                    time.sleep(0.1)
             except Empty:
                 continue
             except Exception as e:

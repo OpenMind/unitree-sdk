@@ -232,13 +232,13 @@ class OrchestratorAPI(Node):
             # Just started charging - begin confirmation period
             if self.charging_confirmed_time is None:
                 self.charging_confirmed_time = time.time()
-                self.get_logger().info(f"⚡ Charging current detected ({bms.current} mA), confirming...")
+                self.get_logger().info(f"Charging current detected ({bms.current} mA), confirming...")
             else:
                 # Check if we've been charging long enough to confirm
                 elapsed = time.time() - self.charging_confirmed_time
                 if elapsed >= self.charging_confirmation_duration:
                     self.is_charging = True
-                    self.get_logger().info(f"🔋 Charging CONFIRMED after {elapsed:.1f}s - docking successful!")
+                    self.get_logger().info(f"Charging CONFIRMED after {elapsed:.1f}s - docking successful!")
 
                     # Stop the charging dock process since we're now charging
                     if self.charging_manager.is_running():
@@ -251,7 +251,7 @@ class OrchestratorAPI(Node):
             # Stopped charging
             self.is_charging = False
             self.charging_confirmed_time = None
-            self.get_logger().info("🔌 Charging stopped")
+            self.get_logger().info("Charging stopped")
 
         elif not current_is_charging:
             # Not charging and confirmation timer was running - reset it
@@ -347,6 +347,8 @@ class OrchestratorAPI(Node):
             launch_file = data.get('launch_file', 'slam_launch.py')
             map_yaml = data.get('map_yaml', None)
             if self.slam_manager.start(launch_file, map_yaml):
+                # Clear all existing location files for fresh SLAM data collection
+                self.clear_all_location_files()
                 self.manage_base_control()
                 return jsonify({"status": "success", "message": "SLAM started"}), 200
             else:
@@ -940,6 +942,39 @@ class OrchestratorAPI(Node):
         elif not self.should_start_base_control() and self.is_base_control_running():
             self.base_control_manager.stop()
             self.get_logger().info("Base control stopped automatically")
+
+    def clear_all_location_files(self):
+        """
+        Clear all per-map location files when starting SLAM.
+        This allows fresh location data to be collected during the new SLAM session.
+        """
+        try:
+            # Clear global locations file
+            locations_file = os.path.join(self.locations_directory, 'locations.json')
+            if os.path.exists(locations_file):
+                with open(locations_file, 'w') as f:
+                    json.dump({}, f, indent=4)
+                self.get_logger().info("Cleared global locations file")
+
+            # Clear all per-map location files
+            cleared_count = 0
+            if os.path.exists(self.maps_directory):
+                for map_dir in os.listdir(self.maps_directory):
+                    map_path = os.path.join(self.maps_directory, map_dir)
+                    if os.path.isdir(map_path):
+                        locations_file = os.path.join(map_path, 'locations.json')
+                        if os.path.exists(locations_file):
+                            with open(locations_file, 'w') as f:
+                                json.dump({}, f, indent=4)
+                            cleared_count += 1
+            
+            if cleared_count > 0:
+                self.get_logger().info(f"Cleared location files for {cleared_count} maps - ready for fresh SLAM data")
+            else:
+                self.get_logger().info("No existing location files found - starting with clean slate for SLAM")
+                
+        except Exception as e:
+            self.get_logger().error(f"Failed to clear location files: {str(e)}")
 
     def api_request_callback(self, msg: OMAPIRequest):
         """

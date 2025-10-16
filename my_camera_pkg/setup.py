@@ -12,8 +12,11 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # Add this line so launch files get installed
+        # Launch files
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
+        # Config files - add this line
+        (os.path.join('share', package_name, 'config', 'unitree_go2_cam_indiana'), 
+            glob('config/unitree_go2_cam_indiana/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,12 +27,12 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-        'apriltag_detector = my_camera_pkg.apriltag_detector:main',
-        'go2_apriltag_detector = my_camera_pkg.go2_apriltag_detector:main',
-        'go2_tag_follower = my_camera_pkg.go2_tag_follower:main',
-        'go2_tag_charger = my_camera_pkg.go2_tag_charger:main',
-        'go2_dock = my_camera_pkg.go2_nav_to_charger_final:main',
-        'go2_camera_publisher = my_camera_pkg.go2_camera_with_adjustable_publisher:main',
+            'apriltag_detector = my_camera_pkg.apriltag_detector:main',
+            'go2_apriltag_detector = my_camera_pkg.go2_apriltag_detector:main',
+            'go2_tag_follower = my_camera_pkg.go2_tag_follower:main',
+            'go2_tag_charger = my_camera_pkg.go2_tag_charger:main',
+            'go2_dock = my_camera_pkg.go2_nav_to_charger_final:main',
+            'go2_camera_publisher = my_camera_pkg.go2_camera_with_adjustable_publisher:main',
         ],
     },
 )

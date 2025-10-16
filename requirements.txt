@@ -21,3 +21,4 @@ typing-extensions==4.15.0
 typing-inspection==0.4.1
 numpy>=1.21.0,<2.0.0
 opencv-python>=4.8.0,<4.10.0
+apriltag==0.0.16

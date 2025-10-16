@@ -34,8 +34,8 @@ class SimpleGoalSender(Node):
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         
         # Define goal position and orientation  (bearing angle)
-        self.goal_position = {'x': -0.7315, 'y': -1.1337, 'z': 0.0}
-        self.goal_orientation = {'x': 0.0, 'y': 0.0, 'z': -0.7352, 'w': 0.7}
+        self.goal_position = {'x': 0.01612, 'y': 0.1392, 'z': 0.0}
+        self.goal_orientation = {'x': 0.0, 'y': 0.0, 'z': 0.9512, 'w': 0.3085}
 
         # Precompute goal yaw (deg)
         self.goal_yaw_deg = yaw_from_quaternion(

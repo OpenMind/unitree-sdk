@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from pupil_apriltags import Detector
+import apriltag
 
 import rclpy
 from rclpy.node import Node
@@ -52,14 +52,16 @@ class AprilTagNode(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # AprilTag detector with tuned params
-        self.detector = Detector(
-            families='tag36h11',
-            nthreads=2,
-            quad_decimate=1.0,   # 1.0 = no downsampling (better accuracy),  number bigger faster but not accurate 
-            quad_sigma=0.0,
-            refine_edges=True,
-            decode_sharpening=0.25,
-            debug=0
+        self.detector = apriltag.Detector(
+            options=apriltag.DetectorOptions(
+                families='tag36h11',
+                nthreads=2,
+                quad_decimate=1.0,   # 1.0 = no downsampling (better accuracy),  number bigger faster but not accurate 
+                quad_sigma=0.0,
+                refine_edges=True,
+                decode_sharpening=0.25,
+                debug=0
+            )
         )
 
 
@@ -113,19 +115,24 @@ class AprilTagNode(Node):
         tag_dict = {}
 
 
-        # --- Detect each tag separately using correct size ---
-        tag_dict = {}
-        for tag_id, size in self.tag_sizes.items():
-            detections = self.detector.detect(
-                frame,
-                estimate_tag_pose=True,  # compute pose immediately
-                camera_params=self.camera_params,
-                tag_size=size
-            )
-            # Keep only detections matching this ID
-            for det in detections:
-                if det.tag_id == tag_id:
-                    tag_dict[det.tag_id] = det      
+        # --- Detect all tags first, then estimate poses separately ---
+        detections = self.detector.detect(frame)
+        
+        # Estimate pose for each detection based on tag size
+        for det in detections:
+            tag_id = det.tag_id
+            if tag_id in self.tag_sizes:
+                # Estimate pose using camera parameters and tag size
+                tag_size = self.tag_sizes[tag_id]
+                pose_r, pose_t, pose_err = self.detector.detection_pose(
+                    det, self.camera_params, tag_size
+                )
+                # Store pose in detection object for compatibility
+                det.pose_R = pose_r
+                det.pose_t = pose_t
+                det.pose_err = pose_err
+                
+                tag_dict[det.tag_id] = det
 
 
         # --- Draw all detected tags ---

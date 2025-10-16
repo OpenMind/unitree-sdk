@@ -31,6 +31,8 @@
                       ".*/om/ai/response",
                       ".*/om/mode/request",
                       ".*/om/mode/response",
+                      ".*/om/tts/request",
+                      ".*/om/tts/response",
 
                       // Motion control
                       ".*/cmd_vel",
@@ -133,6 +135,8 @@
                       ".*/om/ai/response",
                       ".*/om/mode/request",
                       ".*/om/mode/response",
+                      ".*/om/tts/request",
+                      ".*/om/tts/response",
 
                       // Motion control
                       ".*/cmd_vel",

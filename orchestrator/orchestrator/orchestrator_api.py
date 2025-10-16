@@ -9,7 +9,7 @@ from rclpy.node import Node
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from typing import Dict, Optional
-from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse, OMModeRequest, OMModeReponse
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse, OMModeRequest, OMModeReponse, OMTTSRequest, OMTTSReponse
 from unitree_go.msg import LowState
 import requests
 from pydantic import BaseModel, Field
@@ -207,6 +207,19 @@ class OrchestratorAPI(Node):
             OMModeReponse,
             '/om/mode/response',
             self.mode_response_callback,
+            10,
+        )
+
+        self.tts_request_pub = self.create_publisher(
+            OMTTSRequest,
+            '/om/tts/request',
+            10,
+        )
+
+        self.tts_request_sub = self.create_subscription(
+            OMTTSReponse,
+            '/om/tts/response',
+            self.tts_response_callback,
             10,
         )
 
@@ -808,6 +821,24 @@ class OrchestratorAPI(Node):
 
         self.api_response_pub.publish(response_msg)
 
+    def tts_response_callback(self, msg: OMTTSReponse):
+        """
+        Callback for TTS response messages.
+
+        Parameters:
+        ----------
+        msg : OMTTSReponse
+            The received AI response message.
+        """
+        response_msg = OMAPIResponse()
+        response_msg.header.stamp = self.get_clock().now().to_msg()
+        response_msg.request_id = msg.request_id
+        response_msg.code = msg.code
+        response_msg.status = msg.status
+        response_msg.message = msg.status
+
+        self.api_response_pub.publish(response_msg)
+
     def save_map(self, map_name: str, map_directory: Optional[str] = None) -> Dict[str, str]:
         """
         Save the current map using both slam_toolbox and standard ROS2 formats.
@@ -1153,6 +1184,38 @@ class OrchestratorAPI(Node):
                 mode_request_msg.code = 0
                 mode_request_msg.mode = msg.parameters
                 self.mode_request_pub.publish(mode_request_msg)
+                return
+
+            elif action == "tts_status":
+                # Code 2 is for a status request
+                self.get_logger().info("Received request for TTS status")
+                tts_request_msg = OMTTSRequest()
+                tts_request_msg.header.stamp = self.get_clock().now().to_msg()
+                tts_request_msg.request_id = msg.request_id
+                tts_request_msg.code = 2
+                self.tts_request_pub.publish(tts_request_msg)
+                return
+
+            elif action == "enable_tts":
+                # Code 1 is for enabling TTS
+                self.get_logger().info("Received request to enable AI")
+                tts_request_msg = OMTTSRequest()
+                tts_request_msg.header.stamp = self.get_clock().now().to_msg()
+                tts_request_msg.header.frame_id = "om_api"
+                tts_request_msg.request_id = msg.request_id
+                tts_request_msg.code = 1
+                self.tts_request_pub.publish(tts_request_msg)
+                return
+
+            elif action == "disable_tts":
+                # Code 0 is for disabling TTS
+                self.get_logger().info("Received request to disable AI")
+                tts_request_msg = OMTTSRequest()
+                tts_request_msg.header.stamp = self.get_clock().now().to_msg()
+                tts_request_msg.header.frame_id = "om_api"
+                tts_request_msg.request_id = msg.request_id
+                tts_request_msg.code = 0
+                self.tts_request_pub.publish(tts_request_msg)
                 return
 
             elif action == "remote_control":

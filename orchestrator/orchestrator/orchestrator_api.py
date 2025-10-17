@@ -1005,12 +1005,12 @@ class OrchestratorAPI(Node):
                             with open(locations_file, 'w') as f:
                                 json.dump({}, f, indent=4)
                             cleared_count += 1
-            
+
             if cleared_count > 0:
                 self.get_logger().info(f"Cleared location files for {cleared_count} maps - ready for fresh SLAM data")
             else:
                 self.get_logger().info("No existing location files found - starting with clean slate for SLAM")
-                
+
         except Exception as e:
             self.get_logger().error(f"Failed to clear location files: {str(e)}")
 
@@ -1198,7 +1198,7 @@ class OrchestratorAPI(Node):
 
             elif action == "enable_tts":
                 # Code 1 is for enabling TTS
-                self.get_logger().info("Received request to enable AI")
+                self.get_logger().info("Received request to enable TTS")
                 tts_request_msg = OMTTSRequest()
                 tts_request_msg.header.stamp = self.get_clock().now().to_msg()
                 tts_request_msg.header.frame_id = "om_api"
@@ -1209,7 +1209,7 @@ class OrchestratorAPI(Node):
 
             elif action == "disable_tts":
                 # Code 0 is for disabling TTS
-                self.get_logger().info("Received request to disable AI")
+                self.get_logger().info("Received request to disable TTS")
                 tts_request_msg = OMTTSRequest()
                 tts_request_msg.header.stamp = self.get_clock().now().to_msg()
                 tts_request_msg.header.frame_id = "om_api"

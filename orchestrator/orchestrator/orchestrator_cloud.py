@@ -291,14 +291,12 @@ class OrchestratorCloud(Node):
         if self.local_api_ws:
             try:
                 self.local_api_ws.broadcast(json.dumps(response_data))
-                self.get_logger().info("API response sent to all local clients.")
             except Exception as e:
                 self.get_logger().error(f"Failed to send API response to all local clients: {e}")
 
         if self.cloud_api_ws and self.cloud_api_ws.connected:
             try:
                 self.cloud_api_ws.send_message(json.dumps(response_data))
-                self.get_logger().info("API response sent.")
             except Exception as e:
                 self.get_logger().error(f"Failed to send API response: {e}")
 

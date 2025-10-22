@@ -77,7 +77,6 @@ class WebSocketServer:
 
         for websocket in connections:
             try:
-                self.logger.info(f"Sending message to {websocket.remote_address}")
                 await websocket.send(message)
             except ConnectionClosed:
                 disconnected.add(websocket)
@@ -180,7 +179,6 @@ class WebSocketServer:
             return
 
         self._broadcast_queue.put(message)
-        self.logger.info(f"Message queued for broadcast: {len(message)} bytes")
 
     def is_running(self) -> bool:
         """

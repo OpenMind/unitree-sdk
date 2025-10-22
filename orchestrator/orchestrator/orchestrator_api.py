@@ -145,7 +145,6 @@ class OrchestratorAPI(Node):
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
         os.makedirs(self.locations_directory, mode=0o755, exist_ok=True)
 
-        # Subscribe to lowstate for charging detection
         self.lowstate_sub = self.create_subscription(
             LowState,
             '/lf/lowstate',
@@ -153,14 +152,12 @@ class OrchestratorAPI(Node):
             10
         )
 
-        # Charging state tracking
         self.is_charging = False
         self.battery_soc = 0.0
         self.battery_current = 0.0
         self.charging_confirmed_time = None
-        self.charging_confirmation_duration = 3.0  # Wait 3 seconds to confirm stable charging
+        self.charging_confirmation_duration = 3.0
 
-        # TF2 setup for getting robot pose
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
@@ -247,20 +244,16 @@ class OrchestratorAPI(Node):
         # Detect charging based on current (positive = charging)
         current_is_charging = bms.current > 0.3  # 0.3 mA threshold to avoid noise
 
-        # Handle charging state transition
         if current_is_charging and not self.is_charging:
-            # Just started charging - begin confirmation period
             if self.charging_confirmed_time is None:
                 self.charging_confirmed_time = time.time()
                 self.get_logger().info(f"Charging current detected ({bms.current} mA), confirming...")
             else:
-                # Check if we've been charging long enough to confirm
                 elapsed = time.time() - self.charging_confirmed_time
                 if elapsed >= self.charging_confirmation_duration:
                     self.is_charging = True
                     self.get_logger().info(f"Charging CONFIRMED after {elapsed:.1f}s - docking successful!")
 
-                    # Stop the charging dock process since we're now charging
                     if self.charging_manager.is_running():
                         self.get_logger().info("Stopping charging dock process - robot is now charging")
                         self.charging_manager.stop()
@@ -268,13 +261,11 @@ class OrchestratorAPI(Node):
                     self.charging_confirmed_time = None
 
         elif not current_is_charging and self.is_charging:
-            # Stopped charging
             self.is_charging = False
             self.charging_confirmed_time = None
             self.get_logger().info("Charging stopped")
 
         elif not current_is_charging:
-            # Not charging and confirmation timer was running - reset it
             if self.charging_confirmed_time is not None:
                 self.get_logger().info("Charging detection cancelled - current dropped")
                 self.charging_confirmed_time = None
@@ -289,7 +280,6 @@ class OrchestratorAPI(Node):
             Dictionary with position and orientation, or None if transform fails.
         """
         try:
-            # Lookup transform from map to base_link
             transform = self.tf_buffer.lookup_transform(
                 'map',
                 'base_link',
@@ -297,7 +287,6 @@ class OrchestratorAPI(Node):
                 timeout=rclpy.duration.Duration(seconds=1.0)
             )
 
-            # Extract position and orientation
             pose = {
                 "position": {
                     "x": transform.transform.translation.x,
@@ -367,7 +356,6 @@ class OrchestratorAPI(Node):
             launch_file = data.get('launch_file', 'slam_launch.py')
             map_yaml = data.get('map_yaml', None)
             if self.slam_manager.start(launch_file, map_yaml):
-                # Clear all existing location files for fresh SLAM data collection
                 self.clear_all_location_files()
                 self.manage_base_control()
                 return jsonify({"status": "success", "message": "SLAM started"}), 200
@@ -444,28 +432,24 @@ class OrchestratorAPI(Node):
             Start autonomous docking sequence to charger.
             Requires Nav2 to be running.
             """
-            # Check if Nav2 is running (prerequisite)
             if not self.is_nav2_running():
                 return jsonify({
                     "status": "error",
                     "message": "Nav2 must be running to start charging dock. Please start Nav2 first."
                 }), 400
 
-            # Check if charging process is already running
             if self.charging_manager.is_running():
                 return jsonify({
                     "status": "error",
                     "message": "Charging dock process is already running"
                 }), 400
 
-            # Check if already charging
             if self.is_charging:
                 return jsonify({
                     "status": "error",
                     "message": "Robot is already charging"
                 }), 400
 
-            # Start the charging dock process
             data = request.get_json(silent=True) or {}
             launch_file = data.get('launch_file', 'go2_charge.launch.py')
 
@@ -714,7 +698,6 @@ class OrchestratorAPI(Node):
             label = data['label']
             description = data.get('description', '')
 
-            # Get current robot pose in map frame
             pose = self.get_robot_pose_in_map()
             if pose is None:
                 return jsonify({
@@ -722,10 +705,8 @@ class OrchestratorAPI(Node):
                     "message": "Failed to get robot position from map frame"
                 }), 500
 
-            # Generate timestamp
             timestamp = datetime.now().isoformat()
 
-            # Create location data
             location = {
                 "name": label,
                 "description": description,
@@ -733,7 +714,6 @@ class OrchestratorAPI(Node):
                 "pose": pose
             }
 
-            # Validate with LocationModel
             try:
                 validated_location = LocationModel(**location)
                 location = validated_location.model_dump()
@@ -743,14 +723,12 @@ class OrchestratorAPI(Node):
                     "message": f"Invalid location data: {str(e)}"
                 }), 400
 
-            # Create map directory if it doesn't exist
             map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
             locations_file = os.path.join(self.locations_directory, 'locations.json')
 
             os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
             os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
 
-            # Load existing locations for this map
             existing_locations = {}
             if os.path.exists(map_locations_file):
                 try:
@@ -759,15 +737,12 @@ class OrchestratorAPI(Node):
                 except Exception as e:
                     self.get_logger().error(f"Failed to read existing locations: {str(e)}")
 
-            # Add/update the new location
             existing_locations[label] = location
 
-            # Save to map-specific locations file
             try:
                 with open(map_locations_file, 'w') as f:
                     json.dump(existing_locations, f, indent=4)
 
-                # Also update the global locations file
                 with open(locations_file, 'w') as f:
                     json.dump(existing_locations, f, indent=4)
 

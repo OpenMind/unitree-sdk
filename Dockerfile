@@ -2,7 +2,9 @@ FROM ros:humble-ros-base-jammy AS base
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y
+
+RUN apt-get install -y \
     software-properties-common \
     python3-pip \
     python3.10 \

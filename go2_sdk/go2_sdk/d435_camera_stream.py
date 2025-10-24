@@ -121,16 +121,14 @@ class D435RGBStream(Node):
             "-preset", "ultrafast",
             "-tune", "zerolatency",
             "-b:v", f"{int(400 * self.current_fps / 15)}k",
-            "-g", str(max(15, int(self.current_fps * 2))),  # GOP size
+            "-g", str(max(15, int(self.current_fps * 2))),
             "-keyint_min", str(max(5, int(self.current_fps / 2))),
             "-vsync", "cfr",
 
             # --- Output ---
-            "-f", "tee",
-            "-map", "0:v",
-            "[f=rtsp:rtsp_transport=tcp]rtsp://localhost:8554/down_camera"
-            "|"
-            f"[f=rtsp:rtsp_transport=tcp]rtsp://api-video-ingest.openmind.org:8554/down_camera/{self.api_key_id}?api_key={self.api_key}"
+            "-f", "rtsp",
+            "-rtsp_transport", "tcp",
+            "rtsp://localhost:8554/down_camera"
         ]
 
         try:

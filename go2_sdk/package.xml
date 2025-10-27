@@ -32,6 +32,7 @@
   <depend>nav2_smoother</depend>
   <depend>nav2_velocity_smoother</depend>
   <depend>nav2_waypoint_follower</depend>
+  <depend>spatio_temporal_voxel_layer</depend>
   <depend>joy</depend>
   <depend>teleop_twist_joy</depend>
   <depend>realsense2_camera</depend>

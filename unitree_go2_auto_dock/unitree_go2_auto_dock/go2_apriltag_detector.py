@@ -45,7 +45,7 @@ class AprilTagNode(Node):
 
         # Load intrinsics using ROS2 package path (works in Docker and local)
         try:
-            pkg_share = get_package_share_directory('my_camera_pkg')
+            pkg_share = get_package_share_directory('unitree_go2_auto_dock')
             yaml_path = os.path.join(pkg_share, 'config', 'unitree_go2_cam_indiana', 'camera_info.yaml')
             self.load_camera_intrinsics(yaml_path)
         except Exception as e:
@@ -54,7 +54,6 @@ class AprilTagNode(Node):
         
         # Subscriptions
         self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
-        #self.create_subscription(CameraInfo, '/camera/camera_info', self.camera_info_callback, 10)
 
         # Publisher
         self.pose_pub = self.create_publisher(PoseStamped, '/apriltag_pose', 10)
@@ -67,10 +66,8 @@ class AprilTagNode(Node):
             options=apriltag.DetectorOptions(
                 families='tag36h11',
                 nthreads=2,
-                quad_decimate=1.0,   # 1.0 = no downsampling (better accuracy),  number bigger faster but not accurate 
-                quad_sigma=0.0,
+                quad_decimate=1.0,   # 1.0 = no downsampling (better accuracy)
                 refine_edges=True,
-                decode_sharpening=0.25,
                 debug=0
             )
         )
@@ -95,8 +92,42 @@ class AprilTagNode(Node):
         cy = calib["camera_matrix"]["data"][5]
 
         self.camera_params = [fx, fy, cx, cy]
+        self.camera_matrix = np.array([
+            [fx, 0, cx],
+            [0, fy, cy],
+            [0, 0, 1]
+        ], dtype=np.float32)
+        
         self.get_logger().info(f"Loaded intrinsics from {yaml_file}")
         self.get_logger().info(f"Camera parameters: fx={fx:.2f}, fy={fy:.2f}, cx={cx:.2f}, cy={cy:.2f}")
+
+    def estimate_pose_from_corners(self, corners, tag_size):
+        """
+        Estimate pose using OpenCV's solvePnP
+        """
+        # Define 3D corners of the tag (in tag coordinate system)
+        tag_corners_3d = np.array([
+            [-tag_size/2, -tag_size/2, 0],
+            [ tag_size/2, -tag_size/2, 0],
+            [ tag_size/2,  tag_size/2, 0],
+            [-tag_size/2,  tag_size/2, 0]
+        ], dtype=np.float32)
+        
+        # Solve PnP
+        success, rvec, tvec = cv2.solvePnP(
+            tag_corners_3d,
+            corners.astype(np.float32),
+            self.camera_matrix,
+            None,
+            flags=cv2.SOLVEPNP_IPPE_SQUARE
+        )
+        
+        if success:
+            # Convert rotation vector to matrix
+            R, _ = cv2.Rodrigues(rvec)
+            return R, tvec.reshape(3, 1)
+        else:
+            return None, None
 
     def image_callback(self, msg: Image):
         if self.camera_params is None:
@@ -121,44 +152,106 @@ class AprilTagNode(Node):
         see_target = 0.0
         see_angle = 0.0
 
+        # Dictionary to store detection with pose information
         tag_dict = {}
 
-        # --- Detect all tags first, then estimate poses separately ---
+        # Detect all tags
         detections = self.detector.detect(frame)
         
         # Estimate pose for each detection based on tag size
         for det in detections:
             tag_id = det.tag_id
             if tag_id in self.tag_sizes:
-                # Estimate pose using camera parameters and tag size
                 tag_size = self.tag_sizes[tag_id]
-                pose_r, pose_t, pose_err = self.detector.detection_pose(
-                    det, self.camera_params, tag_size
-                )
-                # Store pose in detection object for compatibility
-                det.pose_R = pose_r
-                det.pose_t = pose_t
-                det.pose_err = pose_err
                 
-                tag_dict[det.tag_id] = det
+                try:
+                    # Try using the apriltag detection_pose first
+                    result = self.detector.detection_pose(det, self.camera_params, tag_size)
+                    
+                    if isinstance(result, tuple) and len(result) == 3:
+                        # Extract the 4x4 transformation matrix
+                        T_matrix = result[0]
+                        pose_err1 = result[1]
+                        pose_err2 = result[2]
+                        
+                        # Extract rotation (upper-left 3x3) and translation (upper-right 3x1)
+                        pose_R = T_matrix[:3, :3]  # 3x3 rotation matrix
+                        pose_t = T_matrix[:3, 3].reshape(3, 1)  # 3x1 translation vector
+                        
+                        # Store detection with pose information
+                        tag_dict[tag_id] = {
+                            'detection': det,
+                            'pose_R': pose_R,
+                            'pose_t': pose_t,
+                            'pose_err': pose_err2  # Use the second error metric
+                        }
+                        
+                        if self.show_debug_msg:
+                            self.get_logger().debug(f"Tag {tag_id}: R shape={pose_R.shape}, t shape={pose_t.shape}")
+                    else:
+                        # Fallback to OpenCV if format is unexpected
+                        pose_R, pose_t = self.estimate_pose_from_corners(det.corners, tag_size)
+                        
+                        if pose_R is not None and pose_t is not None:
+                            tag_dict[tag_id] = {
+                                'detection': det,
+                                'pose_R': pose_R,
+                                'pose_t': pose_t,
+                                'pose_err': 0
+                            }
+                            if self.show_debug_msg:
+                                self.get_logger().info(f"Used OpenCV fallback for tag {tag_id}")
+                        
+                except Exception as e:
+                    # Fallback to OpenCV on any error
+                    pose_R, pose_t = self.estimate_pose_from_corners(det.corners, tag_size)
+                    
+                    if pose_R is not None and pose_t is not None:
+                        tag_dict[tag_id] = {
+                            'detection': det,
+                            'pose_R': pose_R,
+                            'pose_t': pose_t,
+                            'pose_err': 0
+                        }
+                        if self.show_debug_msg:
+                            self.get_logger().warning(f"Error with apriltag pose for tag {tag_id}: {e}, using OpenCV")
+
+        # Draw detected tags if debug mode
+        if self.show_debug_img:
+            for tag_id, tag_info in tag_dict.items():
+                det = tag_info['detection']
+                for i in range(4):
+                    pt1 = tuple(det.corners[i - 1, :].astype(int))
+                    pt2 = tuple(det.corners[i, :].astype(int))
+                    cv2.line(frame_bgr, pt1, pt2, (0, 255, 0), 2)
+                cv2.circle(frame_bgr, tuple(det.center.astype(int)), 5, (0, 0, 255), -1)
+                cv2.putText(frame_bgr, f"ID:{det.tag_id}",
+                           (int(det.center[0]), int(det.center[1]) - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            cv2.imshow("AprilTag Detection", frame_bgr)
+            cv2.waitKey(1)
 
         if 1 in tag_dict:
-            det = tag_dict[1]  # <-- select tag 1 explicitly
+            tag_info = tag_dict[1]  # Get the dictionary with detection and pose info
+            det = tag_info['detection']
+            pose_R = tag_info['pose_R']
+            pose_t = tag_info['pose_t']
+            
             see_target = 1.0
             # Pose message
             pose = PoseStamped()
             pose.header = msg.header
             pose.header.frame_id = "camera"
 
-            pose.pose.position.x = float(det.pose_t[0][0])  # left/right (m)
-            pose.pose.position.y = float(det.pose_t[1][0])  # vertical 
-            pose.pose.position.z = float(det.pose_t[2][0])  # forward (m)
+            pose.pose.position.x = float(pose_t[0][0])  # left/right (m)
+            pose.pose.position.y = float(pose_t[1][0])  # vertical 
+            pose.pose.position.z = float(pose_t[2][0])  # forward (m)
 
             dx = pose.pose.position.x 
             dy = pose.pose.position.y
             dz = pose.pose.position.z
 
-            R = det.pose_R
+            R = pose_R
             q = self.rotation_matrix_to_quaternion(R)
             pose.pose.orientation.x = q[0]
             pose.pose.orientation.y = q[1]
@@ -181,7 +274,7 @@ class AprilTagNode(Node):
 
             # Original tag-to-camera translation
             t = np.array([dx, dy, dz]).reshape(3, 1)  # dx, dy, dz from detection
-            R = det.pose_R  # 3x3 rotation matrix
+            R = pose_R  # 3x3 rotation matrix
 
             # Invert transform to get camera in tag frame
             R_inv = R.T
@@ -266,11 +359,18 @@ class AprilTagNode(Node):
         
         for tag_id1, tag_id2, known_distance, pair_type in tag_pairs:
             if tag_id1 in tag_dict and tag_id2 in tag_dict:
-                det1, det2 = tag_dict[tag_id1], tag_dict[tag_id2]
+                # Extract pose information from the stored dictionaries
+                tag1_info = tag_dict[tag_id1]
+                tag2_info = tag_dict[tag_id2]
+                
+                det1 = tag1_info['detection']
+                det2 = tag2_info['detection']
+                pose_t1 = tag1_info['pose_t']
+                pose_t2 = tag2_info['pose_t']
                 
                 # Extract 3D positions
-                p1 = np.array([det1.pose_t[0][0], det1.pose_t[1][0], det1.pose_t[2][0]])
-                p2 = np.array([det2.pose_t[0][0], det2.pose_t[1][0], det2.pose_t[2][0]])
+                p1 = np.array([pose_t1[0][0], pose_t1[1][0], pose_t1[2][0]])
+                p2 = np.array([pose_t2[0][0], pose_t2[1][0], pose_t2[2][0]])
                 
                 # Vector from tag1 → tag2
                 v12 = p2 - p1

@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = 'my_camera_pkg'
+package_name = 'unitree_go2_auto_dock'
 
 setup(
     name=package_name,
@@ -22,17 +22,17 @@ setup(
     zip_safe=True,
     maintainer='jetson',
     maintainer_email='147775420+openminddev@users.noreply.github.com',
-    description='USB Camera Launch Package',
+    description='Unitree Go2 Autonomous Docking Package',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'apriltag_detector = my_camera_pkg.apriltag_detector:main',
-            'go2_apriltag_detector = my_camera_pkg.go2_apriltag_detector:main',
-            'go2_tag_follower = my_camera_pkg.go2_tag_follower:main',
-            'go2_tag_charger = my_camera_pkg.go2_tag_charger:main',
-            'go2_dock = my_camera_pkg.go2_nav_to_charger_final:main',
-            'go2_camera_publisher = my_camera_pkg.go2_camera_with_adjustable_publisher:main',
+            'apriltag_detector = unitree_go2_auto_dock.apriltag_detector:main',
+            'go2_apriltag_detector = unitree_go2_auto_dock.go2_apriltag_detector:main',
+            'go2_tag_follower = unitree_go2_auto_dock.go2_tag_follower:main',
+            'go2_tag_charger = unitree_go2_auto_dock.go2_tag_charger:main',
+            'go2_dock = unitree_go2_auto_dock.go2_nav_to_charger_final:main',
+            'go2_camera_publisher = unitree_go2_auto_dock.go2_camera_with_adjustable_publisher:main',
         ],
     },
 )

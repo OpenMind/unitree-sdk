@@ -160,19 +160,19 @@ class SimpleGoalSender(Node):
             # Start post-navigation tasks
             self.get_logger().info('Starting camera...')
             self.camera_process = subprocess.Popen(
-                ['ros2', 'run', 'my_camera_pkg', 'go2_camera_publisher']
+                ['ros2', 'run', 'unitree_go2_auto_dock', 'go2_camera_publisher']
             )
             time.sleep(4)
 
             self.get_logger().info('Starting AprilTag detector...')
             self.detector_process = subprocess.Popen(
-                ['ros2', 'run', 'my_camera_pkg', 'go2_apriltag_detector']
+                ['ros2', 'run', 'unitree_go2_auto_dock', 'go2_apriltag_detector']
             )
             time.sleep(4)
 
             self.get_logger().info('Starting charging routine...')
             self.charger_process = subprocess.Popen(
-                ['ros2', 'run', 'my_camera_pkg', 'go2_tag_charger']
+                ['ros2', 'run', 'unitree_go2_auto_dock', 'go2_tag_charger']
             )
             
             # Start monitoring thread

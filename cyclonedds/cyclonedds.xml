@@ -2,7 +2,7 @@
   <Domain>
     <General>
       <Interfaces>
-        <NetworkInterface name="${CYCLONE_INTERFACE:-eno1}" priority="default" multicast="default" />
+        <NetworkInterface name="${CYCLONEDDS_INTERFACE:-eno1}" priority="default" multicast="default" />
       </Interfaces>
     </General>
     <Discovery>

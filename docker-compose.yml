@@ -18,32 +18,6 @@ services:
         max-file: "3"
     restart: unless-stopped
 
-  # unitree_go2_sdk:
-  #   build: .
-  #   image: openmindagi/unitree_go2_sdk:latest
-  #   container_name: unitree_go2_sdk
-  #   network_mode: host
-  #   devices:
-  #     - /dev/ttyUSB0:/dev/ttyUSB0
-  #   privileged: true
-  #   environment:
-  #     - DISPLAY=${DISPLAY}
-  #     - QT_X11_NO_MITSHM=1
-  #     - ROS_DOMAIN_ID=0
-  #     - CYCLONEDDS_HOME=/app/cyclonedds/install
-  #     - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
-  #   volumes:
-  #     - /tmp/.X11-unix:/tmp/.X11-unix:rw
-  #     - ./cyclonedds:/cyclonedds
-  #     - .:/ros2_ws/src/unitree_go2_ros2_sdk:rw
-  #     - ./maps:/ros2_ws/maps:rw
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
-  #   restart: unless-stopped
-
   om1_sensor:
     build:
       context: .
@@ -60,6 +34,7 @@ services:
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
+      - CYCLONE_INTERFACE=${CYCLONE_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
       - OM_API_KEY_ID=${OM_API_KEY_ID:-}
     command: "ros2 launch go2_sdk sensor_launch.py"
@@ -107,6 +82,7 @@ services:
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
+      - CYCLONE_INTERFACE=${CYCLONE_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
     command: "ros2 launch orchestrator orchestrator_launch.py"
     volumes:

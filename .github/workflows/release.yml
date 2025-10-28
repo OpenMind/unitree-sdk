@@ -30,7 +30,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: openmindagi/unitree_go2_sdk
+          images: openmindagi/unitree_sdk
           tags: |
             type=semver,pattern=v{{version}},prefix=v
             type=semver,pattern=v{{major}}.{{minor}},prefix=v
@@ -46,7 +46,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=openmindagi/unitree_go2_sdk,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=openmindagi/unitree_sdk,push-by-digest=true,name-canonical=true,push=true
 
   build-arm64:
     runs-on: ubuntu-22.04-arm  # Your ARM64 runner
@@ -69,7 +69,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: openmindagi/unitree_go2_sdk
+          images: openmindagi/unitree_sdk
           tags: |
             type=semver,pattern={{version}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
@@ -85,7 +85,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=openmindagi/unitree_go2_sdk,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=openmindagi/unitree_sdk,push-by-digest=true,name-canonical=true,push=true
 
   create-manifest:
     runs-on: ubuntu-latest
@@ -111,6 +111,6 @@ jobs:
 
             docker buildx imagetools create \
               --tag $tag \
-              openmindagi/unitree_go2_sdk@${{ needs.build-amd64.outputs.image-digest }} \
-              openmindagi/unitree_go2_sdk@${{ needs.build-arm64.outputs.image-digest }}
+              openmindagi/unitree_sdk@${{ needs.build-amd64.outputs.image-digest }} \
+              openmindagi/unitree_sdk@${{ needs.build-arm64.outputs.image-digest }}
           done

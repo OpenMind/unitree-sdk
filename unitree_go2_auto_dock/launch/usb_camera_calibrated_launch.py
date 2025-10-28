@@ -5,10 +5,10 @@ import os
 
 def generate_launch_description():
     # Path to your camera_info.yaml
-    camera_info_file = os.path.join(
-        get_package_share_directory('my_camera_pkg'),
-        'config',
-        'camera_info.yaml'
+    config_path = os.path.join(
+        get_package_share_directory('unitree_go2_auto_dock'),
+        'launch',
+        'usb_camera_calibrated.yaml'
     )
 
     return LaunchDescription([
@@ -25,7 +25,7 @@ def generate_launch_description():
                 "image_height": 480,
                 "framerate": 30.0,
                 "camera_name": "narrow_stereo",
-                "camera_info_url": f"file:///home/openmind/camera_ws/src/my_camera_pkg/config/1080_logi_cam/camera_info.yaml"
+                "camera_info_url": f"file:///home/openmind/camera_ws/src/unitree_go2_auto_dock/config/1080_logi_cam/camera_info.yaml"
             }]
         ),
 

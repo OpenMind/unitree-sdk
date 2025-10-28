@@ -21,7 +21,7 @@ services:
   om1_sensor:
     build:
       context: .
-    image: openmindagi/unitree_go2_sdk:latest
+    image: openmindagi/unitree_sdk:latest
     container_name: om1_sensor
     network_mode: host
     devices:
@@ -53,7 +53,7 @@ services:
   watchdog:
     build:
       context: .
-    image: openmindagi/unitree_go2_sdk:latest
+    image: openmindagi/unitree_sdk:latest
     container_name: watchdog
     network_mode: host
     privileged: true
@@ -72,7 +72,7 @@ services:
   orchestrator:
     build:
       context: .
-    image: openmindagi/unitree_go2_sdk:latest
+    image: openmindagi/unitree_sdk:latest
     container_name: orchestrator
     network_mode: host
     privileged: true

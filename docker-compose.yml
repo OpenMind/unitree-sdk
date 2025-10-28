@@ -34,7 +34,7 @@ services:
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
-      - CYCLONE_INTERFACE=${CYCLONE_INTERFACE:-eno1}
+      - CYCLONEDDS_INTERFACE=${CYCLONEDDS_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
       - OM_API_KEY_ID=${OM_API_KEY_ID:-}
     command: "ros2 launch go2_sdk sensor_launch.py"
@@ -82,7 +82,7 @@ services:
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
-      - CYCLONE_INTERFACE=${CYCLONE_INTERFACE:-eno1}
+      - CYCLONEDDS_INTERFACE=${CYCLONEDDS_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
     command: "ros2 launch orchestrator orchestrator_launch.py"
     volumes:

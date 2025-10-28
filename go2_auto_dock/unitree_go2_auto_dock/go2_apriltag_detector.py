@@ -10,7 +10,7 @@ from geometry_msgs.msg import PoseStamped
 
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
-from std_msgs.msg import Float32MultiArray 
+from std_msgs.msg import Float32MultiArray
 
 import time
 import yaml
@@ -38,26 +38,26 @@ class AprilTagNode(Node):
             4: 0.04,   # ID 4 → 40 mm
             5: 0.04    # ID 5 → 40 mm
         }
-        self.show_debug_img = True 
-        self.show_debug_msg = True 
+        self.show_debug_img = True
+        self.show_debug_msg = True
 
         self.load_camera_info = False
 
         # Load intrinsics using ROS2 package path (works in Docker and local)
         try:
-            pkg_share = get_package_share_directory('unitree_go2_auto_dock')
+            pkg_share = get_package_share_directory('go2_auto_dock')
             yaml_path = os.path.join(pkg_share, 'config', 'unitree_go2_cam_indiana', 'camera_info.yaml')
             self.load_camera_intrinsics(yaml_path)
         except Exception as e:
             self.get_logger().error(f"Failed to load camera intrinsics: {e}")
             raise
-        
+
         # Subscriptions
         self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
 
         # Publisher
         self.pose_pub = self.create_publisher(PoseStamped, '/apriltag_pose', 10)
-        self.relative_pub = self.create_publisher(Float32MultiArray, '/apriltag_relative', 10)  
+        self.relative_pub = self.create_publisher(Float32MultiArray, '/apriltag_relative', 10)
 
         self.tf_broadcaster = TransformBroadcaster(self)
 
@@ -82,7 +82,7 @@ class AprilTagNode(Node):
         """Load camera intrinsics from YAML file"""
         if not os.path.exists(yaml_file):
             raise FileNotFoundError(f"Camera info file not found: {yaml_file}")
-            
+
         with open(yaml_file, "r") as f:
             calib = yaml.safe_load(f)
 
@@ -97,7 +97,7 @@ class AprilTagNode(Node):
             [0, fy, cy],
             [0, 0, 1]
         ], dtype=np.float32)
-        
+
         self.get_logger().info(f"Loaded intrinsics from {yaml_file}")
         self.get_logger().info(f"Camera parameters: fx={fx:.2f}, fy={fy:.2f}, cx={cx:.2f}, cy={cy:.2f}")
 
@@ -112,7 +112,7 @@ class AprilTagNode(Node):
             [ tag_size/2,  tag_size/2, 0],
             [-tag_size/2,  tag_size/2, 0]
         ], dtype=np.float32)
-        
+
         # Solve PnP
         success, rvec, tvec = cv2.solvePnP(
             tag_corners_3d,
@@ -121,7 +121,7 @@ class AprilTagNode(Node):
             None,
             flags=cv2.SOLVEPNP_IPPE_SQUARE
         )
-        
+
         if success:
             # Convert rotation vector to matrix
             R, _ = cv2.Rodrigues(rvec)
@@ -157,27 +157,27 @@ class AprilTagNode(Node):
 
         # Detect all tags
         detections = self.detector.detect(frame)
-        
+
         # Estimate pose for each detection based on tag size
         for det in detections:
             tag_id = det.tag_id
             if tag_id in self.tag_sizes:
                 tag_size = self.tag_sizes[tag_id]
-                
+
                 try:
                     # Try using the apriltag detection_pose first
                     result = self.detector.detection_pose(det, self.camera_params, tag_size)
-                    
+
                     if isinstance(result, tuple) and len(result) == 3:
                         # Extract the 4x4 transformation matrix
                         T_matrix = result[0]
                         pose_err1 = result[1]
                         pose_err2 = result[2]
-                        
+
                         # Extract rotation (upper-left 3x3) and translation (upper-right 3x1)
                         pose_R = T_matrix[:3, :3]  # 3x3 rotation matrix
                         pose_t = T_matrix[:3, 3].reshape(3, 1)  # 3x1 translation vector
-                        
+
                         # Store detection with pose information
                         tag_dict[tag_id] = {
                             'detection': det,
@@ -185,13 +185,13 @@ class AprilTagNode(Node):
                             'pose_t': pose_t,
                             'pose_err': pose_err2  # Use the second error metric
                         }
-                        
+
                         if self.show_debug_msg:
                             self.get_logger().debug(f"Tag {tag_id}: R shape={pose_R.shape}, t shape={pose_t.shape}")
                     else:
                         # Fallback to OpenCV if format is unexpected
                         pose_R, pose_t = self.estimate_pose_from_corners(det.corners, tag_size)
-                        
+
                         if pose_R is not None and pose_t is not None:
                             tag_dict[tag_id] = {
                                 'detection': det,
@@ -201,11 +201,11 @@ class AprilTagNode(Node):
                             }
                             if self.show_debug_msg:
                                 self.get_logger().info(f"Used OpenCV fallback for tag {tag_id}")
-                        
+
                 except Exception as e:
                     # Fallback to OpenCV on any error
                     pose_R, pose_t = self.estimate_pose_from_corners(det.corners, tag_size)
-                    
+
                     if pose_R is not None and pose_t is not None:
                         tag_dict[tag_id] = {
                             'detection': det,
@@ -236,7 +236,7 @@ class AprilTagNode(Node):
             det = tag_info['detection']
             pose_R = tag_info['pose_R']
             pose_t = tag_info['pose_t']
-            
+
             see_target = 1.0
             # Pose message
             pose = PoseStamped()
@@ -244,10 +244,10 @@ class AprilTagNode(Node):
             pose.header.frame_id = "camera"
 
             pose.pose.position.x = float(pose_t[0][0])  # left/right (m)
-            pose.pose.position.y = float(pose_t[1][0])  # vertical 
+            pose.pose.position.y = float(pose_t[1][0])  # vertical
             pose.pose.position.z = float(pose_t[2][0])  # forward (m)
 
-            dx = pose.pose.position.x 
+            dx = pose.pose.position.x
             dy = pose.pose.position.y
             dz = pose.pose.position.z
 
@@ -313,11 +313,11 @@ class AprilTagNode(Node):
             self.tf_broadcaster.sendTransform(t)
 
         bearing_result = self.calculate_improved_bearing_angle(tag_dict)
-    
+
         if bearing_result[0] is not None:
             self.bearing_angle, method_used, valid_bearings = bearing_result
             # Check for high accuracy bearing angle update
-            self.check_and_update_high_accuracy_bearing(valid_bearings)   
+            self.check_and_update_high_accuracy_bearing(valid_bearings)
             see_angle = 1.0 # mean see the angle
 
             if self.show_debug_msg:
@@ -344,80 +344,80 @@ class AprilTagNode(Node):
         """
         Calculate bearing angle using multiple tag pairs for improved accuracy
         """
-        
+
         # Define all possible tag pairs and their known distances
         tag_pairs = [
             # Horizontal pairs
             (2, 3, self.HORIZONTAL_DISTANCE, "horizontal"),
-            (4, 5, self.HORIZONTAL_DISTANCE, "horizontal"),   
+            (4, 5, self.HORIZONTAL_DISTANCE, "horizontal"),
             # Diagonal pairs
             (2, 5, self.DIAGONAL_DISTANCE, "diagonal"),
             (4, 3, self.DIAGONAL_DISTANCE, "diagonal"),
         ]
-        
+
         valid_bearings = []
-        
+
         for tag_id1, tag_id2, known_distance, pair_type in tag_pairs:
             if tag_id1 in tag_dict and tag_id2 in tag_dict:
                 # Extract pose information from the stored dictionaries
                 tag1_info = tag_dict[tag_id1]
                 tag2_info = tag_dict[tag_id2]
-                
+
                 det1 = tag1_info['detection']
                 det2 = tag2_info['detection']
                 pose_t1 = tag1_info['pose_t']
                 pose_t2 = tag2_info['pose_t']
-                
+
                 # Extract 3D positions
                 p1 = np.array([pose_t1[0][0], pose_t1[1][0], pose_t1[2][0]])
                 p2 = np.array([pose_t2[0][0], pose_t2[1][0], pose_t2[2][0]])
-                
+
                 # Vector from tag1 → tag2
                 v12 = p2 - p1
-                
+
                 # Scale to exact known distance
                 v12_norm = np.linalg.norm(v12)
                 if v12_norm > 0:
                     v12 = v12 * (known_distance / v12_norm)
-                    
+
                     # Calculate surface normal for bearing
                     if pair_type == "horizontal":
                         # For horizontal pairs, normal is perpendicular to horizontal vector
                         wall_forward = np.cross(v12, np.array([0, 1, 0]))
-                    else:  
+                    else:
                         # For diagonal pairs, estimate normal from the diagonal direction
                         wall_forward = np.cross(v12, np.array([0, 1, 0]))
-       
+
                     wall_forward_after_cross = wall_forward
                     # Normalize the wall forward vector
                     wall_forward_norm = np.linalg.norm(wall_forward)
                     if wall_forward_norm > 0:
                         wall_forward = wall_forward / wall_forward_norm
-                        
+
                         # Calculate bearing angle using atan2 for proper quadrant handling
                         bearing_angle_radian = np.arctan2(wall_forward[0], wall_forward[2])
                         bearing_angle_deg = np.degrees(bearing_angle_radian)
-                        
+
                         # Normalize to [-180, 180] range
                         if bearing_angle_deg > 180:
                             bearing_angle_deg -= 360
                         elif bearing_angle_deg < -180:
                             bearing_angle_deg += 360
-                        
+
                         # Calculate confidence based on multiple factors
                         detection_confidence = 1.0
                         distance_error = abs(v12_norm - known_distance) / known_distance
                         distance_confidence = max(0.1, 1.0 - distance_error)
                         baseline_confidence = min(2.0, known_distance / 0.05)
-                        
+
                         type_confidence = {
                             'horizontal': 1.0,
                             'vertical': 0.8,
                             'diagonal': 0.9
                         }[pair_type]
-                        
+
                         total_confidence = detection_confidence * distance_confidence * baseline_confidence * type_confidence
-                        
+
                         valid_bearings.append({
                             'angle': bearing_angle_deg,
                             'pair': f"ID{tag_id1}-ID{tag_id2}",
@@ -428,10 +428,10 @@ class AprilTagNode(Node):
                             'v12': v12,
                             'wall_forward_after_cross': wall_forward_after_cross
                         })
-        
+
         if not valid_bearings:
             return None, "No valid tag pairs found", []
-        
+
         # Calculate weighted average bearing
         if len(valid_bearings) == 1:
             final_bearing = valid_bearings[0]['angle']
@@ -439,49 +439,49 @@ class AprilTagNode(Node):
         else:
             weights = [bearing['confidence'] for bearing in valid_bearings]
             angles = [bearing['angle'] for bearing in valid_bearings]
-            
+
             # Handle angle wrapping for averaging (convert to unit vectors)
             x_sum = sum(w * np.cos(np.radians(a)) for w, a in zip(weights, angles))
             y_sum = sum(w * np.sin(np.radians(a)) for w, a in zip(weights, angles))
-            
+
             final_bearing = np.degrees(np.arctan2(y_sum, x_sum))
-            
+
             # Normalize to [-180, 180] range
             if final_bearing > 180:
                 final_bearing -= 360
             elif final_bearing < -180:
                 final_bearing += 360
-            
+
             method_used = f"Weighted average of {len(valid_bearings)} pairs"
-        
+
         return final_bearing, method_used, valid_bearings
 
     def check_and_update_high_accuracy_bearing(self, valid_bearings):
         """
-        Update self.bearing_angle_deg_high_accurate only when all four specific 
+        Update self.bearing_angle_deg_high_accurate only when all four specific
         tag pair estimations (ID2-ID3, ID4-ID5, ID2-ID5, ID4-ID3) are within 3° of their average
         """
         required_pairs = [
             "ID2-ID3",  # horizontal
-            "ID4-ID5",  # horizontal  
+            "ID4-ID5",  # horizontal
             "ID2-ID5",  # diagonal
             "ID4-ID3"   # diagonal
         ]
-        
+
         required_angles = {}
         for bearing in valid_bearings:
             if bearing['pair'] in required_pairs:
                 required_angles[bearing['pair']] = bearing['angle']
-        
+
         if len(required_angles) == 4:
             angles = list(required_angles.values())
             average_angle = np.mean(angles)
-            
+
             max_deviation = max(abs(angle - average_angle) for angle in angles)
-            
+
             if max_deviation <= 3.0:
                 self.bearing_angle_deg_high_accurate = average_angle
-                
+
                 if self.show_debug_img:
                     self.get_logger().info(
                         f"[High Accuracy] Updated bearing to {self.bearing_angle_deg_high_accurate:.1f}° "

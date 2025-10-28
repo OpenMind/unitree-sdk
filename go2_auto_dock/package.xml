@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>unitree_go2_auto_dock</name>
+  <name>go2_auto_dock</name>
   <version>0.0.0</version>
   <description>Unitree Go2 autonomous docking using AprilTags</description>
   <maintainer email="147775420+openminddev@users.noreply.github.com">jetson</maintainer>

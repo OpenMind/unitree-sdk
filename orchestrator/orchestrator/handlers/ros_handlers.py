@@ -3,9 +3,9 @@ import requests
 import threading
 from typing import TYPE_CHECKING
 from uuid import uuid4
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import OccupancyGrid
-from om_api.msg import OMAPIRequest, OMAPIResponse, MapStorage
+from om_api.msg import OMAPIRequest, OMAPIResponse, MapStorage, OMTTSRequest, OMAIRequest, OMModeRequest
 
 if TYPE_CHECKING:
     from ..core.orchestrator_api import OrchestratorAPI
@@ -133,7 +133,7 @@ class ROSHandlers:
         base_url = "http://localhost:5000"
 
         try:
-            # Map ROS API requests to HTTP endpoints
+            # Handle HTTP-based endpoints
             endpoint_map = {
                 'start_slam': '/start/slam',
                 'stop_slam': '/stop/slam',
@@ -171,13 +171,201 @@ class ROSHandlers:
 
                 self._publish_api_response(msg.request_id, response.status_code, "success" if response.ok else "error", response.text)
 
+            # Handle AI-related actions
+            elif action in ["ai_status", "enable_ai", "disable_ai"]:
+                self._handle_ai_request(action, msg)
+
+            # Handle mode-related actions
+            elif action in ["get_mode", "switch_mode"]:
+                self._handle_mode_request(action, msg)
+
+            # Handle TTS-related actions
+            elif action in ["tts_status", "enable_tts", "disable_tts"]:
+                self._handle_tts_request(action, msg)
+
+            # Handle remote control action
+            elif action == "remote_control":
+                self._handle_remote_control(msg)
+
             else:
+                self.orchestrator.get_logger().error(f"Unknown action: {action}")
                 self._publish_api_response(msg.request_id, 400, "error", f"Unknown action: {action}")
 
         except requests.exceptions.RequestException as e:
+            self.orchestrator.get_logger().error(f"HTTP request failed: {str(e)}")
             self._publish_api_response(msg.request_id, 500, "error", f"Request failed: {str(e)}")
         except Exception as e:
+            self.orchestrator.get_logger().error(f"Unexpected error processing API request: {str(e)}")
             self._publish_api_response(msg.request_id, 500, "error", f"Unexpected error: {str(e)}")
+
+    def _handle_ai_request(self, action: str, msg):
+        """
+        Handle AI-related requests.
+
+        Parameters:
+        -----------
+        action : str
+            The AI action to perform (ai_status, enable_ai, disable_ai).
+        msg : OMAPIRequest
+            The original API request message.
+        """
+        action_codes = {
+            'ai_status': 2,    # Status request
+            'enable_ai': 1,    # Enable AI
+            'disable_ai': 0    # Disable AI
+        }
+
+        if action not in action_codes:
+            self._publish_api_response(msg.request_id, 400, "error", f"Unknown AI action: {action}")
+            return
+
+        self.orchestrator.get_logger().info(f"Received request for {action}")
+
+        if not hasattr(self.orchestrator, 'ai_request_pub'):
+            self._publish_api_response(msg.request_id, 500, "error", "AI request publisher not available")
+            return
+
+        try:
+            ai_request_msg = OMAIRequest()
+            ai_request_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+            ai_request_msg.header.frame_id = "om_api"
+            ai_request_msg.request_id = msg.request_id
+            ai_request_msg.code = action_codes[action]
+
+            self.orchestrator.ai_request_pub.publish(ai_request_msg)
+            self.orchestrator.get_logger().info(f"Published AI request: {action}")
+
+        except Exception as e:
+            self.orchestrator.get_logger().error(f"Failed to publish AI request: {str(e)}")
+            self._publish_api_response(msg.request_id, 500, "error", f"Failed to publish AI request: {str(e)}")
+
+    def _handle_mode_request(self, action: str, msg):
+        """
+        Handle mode-related requests.
+
+        Parameters:
+        -----------
+        action : str
+            The mode action to perform (get_mode, switch_mode).
+        msg : OMAPIRequest
+            The original API request message.
+        """
+        if action == "switch_mode" and not msg.parameters:
+            self._publish_api_response(msg.request_id, 400, "error", "Mode parameter is required for switch_mode action")
+            return
+
+        action_codes = {
+            'get_mode': 1,     # Get current mode
+            'switch_mode': 0   # Set mode
+        }
+
+        if action not in action_codes:
+            self._publish_api_response(msg.request_id, 400, "error", f"Unknown mode action: {action}")
+            return
+
+        self.orchestrator.get_logger().info(f"Received request for {action}")
+
+        if not hasattr(self.orchestrator, 'mode_request_pub'):
+            self._publish_api_response(msg.request_id, 500, "error", "Mode request publisher not available")
+            return
+
+        try:
+            mode_request_msg = OMModeRequest()
+            mode_request_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+            mode_request_msg.header.frame_id = "om_api"
+            mode_request_msg.request_id = msg.request_id
+            mode_request_msg.code = action_codes[action]
+            mode_request_msg.mode = msg.parameters if action == "switch_mode" else ""
+
+            self.orchestrator.mode_request_pub.publish(mode_request_msg)
+            self.orchestrator.get_logger().info(f"Published mode request: {action}")
+
+        except Exception as e:
+            self.orchestrator.get_logger().error(f"Failed to publish mode request: {str(e)}")
+            self._publish_api_response(msg.request_id, 500, "error", f"Failed to publish mode request: {str(e)}")
+
+    def _handle_tts_request(self, action: str, msg):
+        """
+        Handle TTS-related requests.
+
+        Parameters:
+        -----------
+        action : str
+            The TTS action to perform (tts_status, enable_tts, disable_tts).
+        msg : OMAPIRequest
+            The original API request message.
+        """
+        action_codes = {
+            'tts_status': 2,   # Status request
+            'enable_tts': 1,   # Enable TTS
+            'disable_tts': 0   # Disable TTS
+        }
+
+        if action not in action_codes:
+            self._publish_api_response(msg.request_id, 400, "error", f"Unknown TTS action: {action}")
+            return
+
+        self.orchestrator.get_logger().info(f"Received request for {action}")
+
+        if not hasattr(self.orchestrator, 'tts_request_pub'):
+            self._publish_api_response(msg.request_id, 500, "error", "TTS request publisher not available")
+            return
+
+        try:
+            tts_request_msg = OMTTSRequest()
+            tts_request_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+            tts_request_msg.header.frame_id = "om_api"
+            tts_request_msg.request_id = msg.request_id
+            tts_request_msg.code = action_codes[action]
+
+            self.orchestrator.tts_request_pub.publish(tts_request_msg)
+            self.orchestrator.get_logger().info(f"Published TTS request: {action}")
+
+        except Exception as e:
+            self.orchestrator.get_logger().error(f"Failed to publish TTS request: {str(e)}")
+            self._publish_api_response(msg.request_id, 500, "error", f"Failed to publish TTS request: {str(e)}")
+
+    def _handle_remote_control(self, msg):
+        """
+        Handle remote control requests.
+
+        Parameters:
+        -----------
+        msg : OMAPIRequest
+            The original API request message containing movement parameters.
+        """
+        if not msg.parameters:
+            self._publish_api_response(msg.request_id, 400, "error", "Command parameter is required for remote_control action")
+            return
+
+        try:
+            speed_parameters = json.loads(msg.parameters)
+        except json.JSONDecodeError:
+            self._publish_api_response(msg.request_id, 400, "error", "Invalid JSON in parameters")
+            return
+
+        vx = speed_parameters.get("vx", 0.0)
+        vy = speed_parameters.get("vy", 0.0)
+        vyaw = speed_parameters.get("vyaw", 0.0)
+
+        if not hasattr(self.orchestrator, 'move_cmd_pub'):
+            self._publish_api_response(msg.request_id, 500, "error", "Move command publisher not available")
+            return
+
+        try:
+            twist = Twist()
+            twist.linear.x = float(vx)
+            twist.linear.y = float(vy)
+            twist.angular.z = float(vyaw)
+
+            self.orchestrator.move_cmd_pub.publish(twist)
+            self.orchestrator.get_logger().info(f"Published remote control command: vx={vx}, vy={vy}, vyaw={vyaw}")
+
+            self._publish_api_response(msg.request_id, 200, "success", f"Remote control command published: vx={vx}, vy={vy}, vyaw={vyaw}")
+
+        except Exception as e:
+            self.orchestrator.get_logger().error(f"Failed to publish remote control command: {str(e)}")
+            self._publish_api_response(msg.request_id, 500, "error", f"Failed to publish remote control command: {str(e)}")
 
     def _publish_api_response(self, request_id: str, code: int, status: str, message: str):
         """

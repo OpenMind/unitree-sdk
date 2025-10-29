@@ -1,4 +1,4 @@
-# Unitree Go2 SDK
+# Unitree SDK
 
 A ROS 2 package that provides SLAM (Simultaneous Localization and Mapping) capabilities for the Unitree Go2 robot using an RPLiDAR sensor, the SLAM Toolbox and the Nav2 stack.
 

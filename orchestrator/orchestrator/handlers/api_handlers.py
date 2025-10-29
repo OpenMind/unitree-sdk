@@ -1,8 +1,10 @@
 import json
 from datetime import datetime
+from typing import TYPE_CHECKING
 from flask import jsonify, request
 
-from ..core.orchestrator_api import OrchestratorAPI
+if TYPE_CHECKING:
+    from ..core.orchestrator_api import OrchestratorAPI
 
 from ..models.data_models import LocationModel
 

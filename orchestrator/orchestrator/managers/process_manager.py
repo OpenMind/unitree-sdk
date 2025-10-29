@@ -44,7 +44,7 @@ class ProcessManager:
                 launch_file
             ]
             if map_yaml:
-                cmd.extend(['map_yaml:=' + map_yaml])
+                cmd.extend(['map_yaml_file:=' + map_yaml])
             self.process = subprocess.Popen(cmd, preexec_fn=os.setsid)
             return True
         return False

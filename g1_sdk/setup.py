@@ -11,7 +11,16 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/g1_sdk']),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/g1_control_launch.py']),
+        ('share/' + package_name + '/launch', [
+            'launch/g1_control_launch.py',
+            'launch/slam_launch.py',
+        ]),
+        ('share/' + package_name + '/urdf', [
+            'urdf/g1_23dof.urdf',
+        ]),
+        ('share/' + package_name + '/config', [
+            'config/slam.yaml',
+        ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,6 +32,7 @@ setup(
         'console_scripts': [
             'cmd_vel_to_g1 = g1_sdk.g1_teleop:main',
             'g1_loco_action = g1_sdk.g1_loco_action:main',
+            'pose_to_tf = g1_sdk.pose_to_tf:main',
         ],
     },
 )

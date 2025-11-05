@@ -12,7 +12,7 @@ setup(
             ['resource/g1_sdk']),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
-            'launch/g1_control_launch.py',
+            'launch/base_control_launch.py',
             'launch/slam_launch.py',
         ]),
         ('share/' + package_name + '/urdf', [

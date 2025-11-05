@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+This launch file is deprecated. Use base_control_launch.py for G1 teleoperation and control.
+"""
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument

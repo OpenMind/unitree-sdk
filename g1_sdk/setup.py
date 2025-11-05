@@ -21,6 +21,9 @@ setup(
         ('share/' + package_name + '/config', [
             'config/slam.yaml',
         ]),
+        ('share/' + package_name + '/meshes', [
+            os.path.join('meshes', f) for f in os.listdir('meshes') if f.endswith('.STL')
+        ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -34,6 +37,7 @@ setup(
             'g1_loco_action = g1_sdk.g1_loco_action:main',
             'pose_to_tf = g1_sdk.pose_to_tf:main',
             'g1_odom = g1_sdk.g1_odom:main',
+            'g1_jointstate = g1_sdk.g1_jointstate:main',
         ],
     },
 )

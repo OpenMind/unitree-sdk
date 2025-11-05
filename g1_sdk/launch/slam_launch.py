@@ -7,6 +7,12 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 def generate_launch_description():
+    g1_jointstate_node = Node(
+        package='g1_sdk',
+        executable='g1_jointstate',
+        name='g1_jointstate',
+        output='screen',
+    )
     g1_odom_node = Node(
         package='g1_sdk',
         executable='g1_odom',
@@ -34,12 +40,12 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        Node(
-            package='joint_state_publisher',
-            executable='joint_state_publisher',
-            name='joint_state_publisher',
-            output='screen',
-        ),
+        # Node(
+        #     package='joint_state_publisher',
+        #     executable='joint_state_publisher',
+        #     name='joint_state_publisher',
+        #     output='screen',
+        # ),
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -70,6 +76,7 @@ def generate_launch_description():
                 'use_inf': True,
             }]
         ),
+        g1_jointstate_node,
         g1_odom_node,
         slam_toolbox_launch,
     ])

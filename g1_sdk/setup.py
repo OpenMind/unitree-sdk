@@ -33,6 +33,7 @@ setup(
             'cmd_vel_to_g1 = g1_sdk.g1_teleop:main',
             'g1_loco_action = g1_sdk.g1_loco_action:main',
             'pose_to_tf = g1_sdk.pose_to_tf:main',
+            'g1_odom = g1_sdk.g1_odom:main',
         ],
     },
 )

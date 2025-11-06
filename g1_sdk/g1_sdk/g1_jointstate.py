@@ -129,19 +129,19 @@ class G1JointStatePublisher(Node):
             self.joint_state_pub.publish(joint_state)
             
             # Log first few messages and then periodically
-            if self.msg_count <= 3 or self.msg_count % 100 == 0:
-                self.get_logger().info(f'Message #{self.msg_count}: Published {len(joint_state.name)} joints')
-                if self.msg_count <= 3:
-                    # Show first few active joints for debugging
-                    for idx, name, pos in active_motors[:5]:
-                        self.get_logger().info(f'  Motor[{idx}] {name}: {pos:.4f} rad')
-                else:
-                    self.get_logger().info(f'  Active motors: {len(active_motors)}/{len(self.motor_to_joint_map)}')
+            # if self.msg_count <= 3 or self.msg_count % 100 == 0:
+            #     self.get_logger().info(f'Message #{self.msg_count}: Published {len(joint_state.name)} joints')
+            #     if self.msg_count <= 3:
+            #         # Show first few active joints for debugging
+            #         for idx, name, pos in active_motors[:5]:
+            #             self.get_logger().info(f'  Motor[{idx}] {name}: {pos:.4f} rad')
+            #     else:
+            #         self.get_logger().info(f'  Active motors: {len(active_motors)}/{len(self.motor_to_joint_map)}')
                 
         except Exception as e:
-            self.get_logger().error(f'Error processing low state: {str(e)}')
+            # self.get_logger().error(f'Error processing low state: {str(e)}')
             import traceback
-            self.get_logger().error(f'Traceback: {traceback.format_exc()}')
+            # self.get_logger().error(f'Traceback: {traceback.format_exc()}')
 
 def main(args=None):
     rclpy.init(args=args)

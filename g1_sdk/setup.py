@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch/base_control_launch.py',
             'launch/slam_launch.py',
+            'launch/nav2_launch.py'
         ]),
         ('share/' + package_name + '/urdf', [
             'urdf/g1_23dof.urdf',

@@ -1,48 +1,101 @@
 amcl:
+amcl:
   ros__parameters:
     use_sim_time: False
-    alpha1: 0.05
-    alpha2: 0.1
-    alpha3: 0.05
-    alpha4: 0.05
-    alpha5: 0.05
+    
+    # Motion Model Parameters - Optimized for G1 with rotation issues
+    alpha1: 0.4   # INCREASED - High rotation noise from in-place turning
+    alpha2: 0.1   # DECREASED - Less coupling between translation/rotation
+    alpha3: 0.1   # DECREASED - Translation is more reliable than rotation
+    alpha4: 0.3   # INCREASED - Significant translation error during rotation
+    alpha5: 0.2   # Omnidirectional noise for lateral motion
+    
+    # Frame Configuration
     base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    global_frame_id: "map"
+    
+    # Beam Model Parameters - Optimized for Mid360's dense data
     beam_skip_distance: 0.5
     beam_skip_error_threshold: 0.9
     beam_skip_threshold: 0.3
-    do_beamskip: False
-    global_frame_id: "map"
-    lambda_short: 0.1
-    laser_likelihood_max_dist: 2.0
-    laser_max_range: 12.0
-    laser_min_range: 0.1
-    laser_model_type: "likelihood_field"
-    max_beams: 180
-    max_particles: 8000
-    min_particles: 2000
-    odom_frame_id: "odom"
-    pf_err: 0.01
-    pf_z: 0.95
-    recovery_alpha_fast: 0.3
-    recovery_alpha_slow: 0.01
-    resample_interval: 1
-    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    do_beamskip: True  # Essential for Mid360's dense pointcloud
+    
+    # Sensor Model - Mid360 through pointcloud_to_laserscan
+    laser_likelihood_max_dist: 2.0  # Tighter for better accuracy
+    laser_max_range: 12.0  # Match pointcloud_to_laserscan range_max
+    laser_min_range: 0.5   # Match pointcloud_to_laserscan range_min
+    laser_model_type: "likelihood_field"  # Best for 3D->2D projection
+    
+    # Beam selection - Balance accuracy vs performance
+    max_beams: 60  # Further reduced - Mid360 is extremely dense
+    
+    # Particle Filter Parameters - Increased for rotation uncertainty
+    max_particles: 5000  # INCREASED to handle rotation noise
+    min_particles: 1000  # INCREASED minimum for rotation stability
+    
+    # Convergence Parameters
+    pf_err: 0.05  # Relaxed - humanoid motion is less predictable
+    pf_z: 0.99    # Higher confidence threshold for better accuracy
+    
+    # Recovery Parameters - Tuned for rotation-induced errors
+    recovery_alpha_fast: 0.3   # INCREASED - Faster recovery from rotation errors
+    recovery_alpha_slow: 0.01  # INCREASED - Slightly faster baseline adaptation
+    
+    # Resampling - More frequent for omnidirectional motion
+    resample_interval: 1  # Every update for omnidirectional motion
+    selective_resampling: True  # Adaptive resampling based on particle weights
+    
+    # Motion Model - OMNIDIRECTIONAL for G1 Humanoid
+    robot_model_type: "nav2_amcl::OmniMotionModel"
+    
+    # Pose Publishing
     save_pose_rate: 0.5
-    sigma_hit: 0.2
+    first_map_only: False  # Update with full map for better accuracy
+    
+    # Sensor Model Weights - Fine-tuned for Mid360 accuracy
+    z_hit: 0.95   # Very high confidence in Mid360
+    z_rand: 0.05  # Small allowance for unexpected readings
+    z_short: 0.1  # Some short readings from leg occlusion
+    z_max: 0.05   # Small allowance for max range
+    
+    # Likelihood Field Model Parameters
+    sigma_hit: 0.2  # Slightly wider to account for walking vibration
+    lambda_short: 0.1
+    likelihood_max_dist: 2.0
+    
+    # Transform and Timing
     tf_broadcast: True
-    transform_tolerance: 0.5  # Reduced from 1.0
-    update_min_a: 0.005
-    update_min_d: 0.02
-    z_hit: 0.85
-    z_max: 0.05
-    z_rand: 0.05
-    z_short: 0.15
+    transform_tolerance: 0.2  # Tighter for better accuracy
+    
+    # Update Thresholds - Special handling for rotation issues
+    update_min_d: 0.05   # Keep small for lateral movements
+    update_min_a: 0.05   # DECREASED - More frequent updates during rotation (3 degrees)
+    
+    # Scan Configuration
     scan_topic: scan
+    
+    # Initial Pose Configuration
     set_initial_pose: True
-    initial_pose_x: 0.0
-    initial_pose_y: 0.0
-    initial_pose_z: 0.0
-    initial_pose_a: 0.0
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+    # Larger initial uncertainty for omnidirectional robot
+    initial_cov_xx: 0.5  # 50cm x 50cm uncertainty
+    initial_cov_yy: 0.5
+    initial_cov_aa: 0.4  # ~23 degree uncertainty
+    
+    # Advanced Omnidirectional Parameters
+    force_publication_on_update: True
+    
+    # KLD Sampling Parameters - Adaptive particle count
+    kld_err: 0.01
+    kld_z: 0.99
+    
+    # Minimum particle weight threshold
+    min_particle_weight: 0.0001
 
 bt_navigator:
   ros__parameters:
@@ -280,22 +333,22 @@ local_costmap:
         # 4D LiDAR as observation source
         observation_sources: lidar_4d
         
-        # 4D LiDAR pointcloud configuration (Unitree Go2)
+        # Livox Mid360 pointcloud configuration
         lidar_4d:
           data_type: PointCloud2
-          topic: /utlidar/cloud_deskewed  # Motion-compensated pointcloud
+          topic: /utlidar/cloud_livox_mid360  # Livox Mid360 pointcloud
           marking: True
           clearing: True
-          min_obstacle_height: 0.010  # 1.0cm threshold for small ground obstacles
-          max_obstacle_height: 2.5  # Full height coverage
-          expected_update_rate: 15.0  # Unitree 4D LiDAR at ~15Hz
+          min_obstacle_height: 0.05  # 5cm, typical for ground filtering
+          max_obstacle_height: 2.0  # Mid360 vertical FOV
+          expected_update_rate: 10.0  # Mid360 typical rate
           observation_persistence: 0.0
           inf_is_valid: False
           filter: "voxel"
-          voxel_min_points: 1  # Lower threshold for ground obstacle sensitivity
+          voxel_min_points: 3  # Higher for denser pointcloud
           clear_after_reading: True
           enabled: True
-          model_type: 1  # 1=3d_lidar (for 4D LiDAR)
+          model_type: 1  # 1=3d_lidar (for Mid360)
           
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"

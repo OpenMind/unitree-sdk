@@ -2,7 +2,7 @@ import rclpy
 import os
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse, OMModeRequest, OMModeReponse, OMTTSRequest, OMTTSReponse, OMASRText
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMAIRequest, OMAIReponse, OMModeRequest, OMModeReponse, OMTTSRequest, OMTTSReponse
 from unitree_go.msg import LowState
 
 from ..managers.process_manager import ProcessManager
@@ -71,7 +71,6 @@ class OrchestratorAPI(Node):
         self.ai_request_sub = self.create_subscription(OMAIReponse, '/om/ai/response', self.ros_handlers.ai_response_callback, 10)
         self.mode_request_sub = self.create_subscription(OMModeReponse, '/om/mode/response', self.ros_handlers.mode_response_callback, 10)
         self.tts_request_sub = self.create_subscription(OMTTSReponse, '/om/tts/response', self.ros_handlers.tts_response_callback, 10)
-        self.asr_text_sub = self.create_subscription(OMASRText, '/om/asr/text', self.ros_handlers.asr_text_callback, 10)
 
     def is_slam_running(self) -> bool:
         """

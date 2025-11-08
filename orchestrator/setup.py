@@ -19,8 +19,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'orchestrator_api = orchestrator.orchestrator_api:main',
-            'orchestrator_cloud = orchestrator.orchestrator_cloud:main'
+            'orchestrator_api = orchestrator.core.orchestrator_api:main',
+            'orchestrator_cloud = orchestrator.core.orchestrator_cloud:main'
         ],
     },
 )

@@ -225,7 +225,7 @@ zenoh-bridge-ros2dds -c ./zenoh/zenoh_bridge_config.json5
 
 ## Production Guidance
 
-We release the Docker image `openmindagi/unitree_go2_sdk`, which provides the full ROS2 system for running the Unitree Go2 SDK.
+We release the Docker image `openmindagi/unitree_sdk`, which provides the full ROS2 system for running the Unitree Go2 SDK.
 
 ### Starting the System
 

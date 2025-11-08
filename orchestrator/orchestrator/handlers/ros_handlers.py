@@ -504,7 +504,6 @@ class ROSHandlers:
         asr_data = {
             "type": "asr",
             "text": msg.text,
-            "is_final": msg.is_final,
             "timestamp": msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         }
         

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import OccupancyGrid
-from om_api.msg import OMAPIRequest, OMAPIResponse, MapStorage, OMTTSRequest, OMAIRequest, OMModeRequest
+from om_api.msg import OMAPIRequest, OMAPIResponse, MapStorage, OMTTSRequest, OMAIRequest, OMModeRequest, OMASRText
 
 if TYPE_CHECKING:
     from ..core.orchestrator_api import OrchestratorAPI
@@ -486,6 +486,33 @@ class ROSHandlers:
             "data": list(map_msg.data)
         }
         self.orchestrator.cloud_connection_manager.send_map_data(map_data)
+
+    def asr_text_callback(self, msg):
+        """
+        Callback function for ASR text messages to broadcast to frontend.
+
+        Parameters:
+        -----------
+        msg : om_api.msg.OMASRText
+            The incoming ASR text message.
+        """
+        if not hasattr(self.orchestrator, 'cloud_connection_manager'):
+            self.orchestrator.get_logger().warning("Cloud connection manager not available")
+            return
+
+        # Broadcast ASR text to WebSocket clients
+        asr_data = {
+            "type": "asr",
+            "text": msg.text,
+            "timestamp": msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        }
+        
+        if self.orchestrator.cloud_connection_manager.local_api_ws:
+            try:
+                self.orchestrator.cloud_connection_manager.local_api_ws.broadcast(json.dumps(asr_data))
+                self.orchestrator.get_logger().info(f"Broadcasted ASR text to frontend: {msg.text}")
+            except Exception as e:
+                self.orchestrator.get_logger().error(f"Failed to broadcast ASR text: {e}")
 
     def cloud_api_response_callback(self, response):
         """

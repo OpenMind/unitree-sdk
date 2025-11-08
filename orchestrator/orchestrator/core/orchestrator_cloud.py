@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
-from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMASRText
 
 from ..managers.cloud_connection_manager import CloudConnectionManager
 from ..managers.map_upload_manager import MapUploadManager
@@ -50,6 +50,7 @@ class OrchestratorCloud(Node):
         self.pose_sub = self.create_subscription(PoseStamped, '/om/pose', self.ros_handlers.cloud_pose_callback, 10)
         self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.ros_handlers.cloud_map_callback, 10)
         self.api_response_sub = self.create_subscription(OMAPIResponse, '/om/api/response', self.ros_handlers.cloud_api_response_callback, 10)
+        self.asr_text_sub = self.create_subscription(OMASRText, '/om/asr/text', self.ros_handlers.asr_text_callback, 10)
 
 def main(args=None):
     """

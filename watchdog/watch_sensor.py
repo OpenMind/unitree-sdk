@@ -8,7 +8,6 @@ import zenoh
 from zenoh_sesson import open_zenoh_session
 from rclpy.node import Node
 import cv2
-import socket
 import subprocess
 
 from sensor_msgs.msg import LaserScan

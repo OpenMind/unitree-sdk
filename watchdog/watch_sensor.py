@@ -141,7 +141,6 @@ class WatchSensor(Node):
         """
         while True:
             try:
-                # Test RTSP audio stream connectivity using ffprobe
                 result = subprocess.run([
                     'ffprobe',
                     '-v', 'quiet',

@@ -230,7 +230,7 @@ class WatchSensor(Node):
                     self.last_zenoh_time = time.time()
 
                 if video_rtsp_timeout:
-                    self.get_logger().warn(f"RTSP stream not responding for {self.timeout_duration}s. Restarting video processor container...")
+                    self.get_logger().warn(f"Video RTSP stream not responding for {self.timeout_duration}s. Restarting video processor container...")
                     self.restart_container(self.video_processor_service_name)
                     self.last_video_rtsp_time = time.time()
 

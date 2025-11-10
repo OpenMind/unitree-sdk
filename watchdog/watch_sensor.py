@@ -114,14 +114,14 @@ class WatchSensor(Node):
                     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                     cap.set(cv2.CAP_PROP_FPS, 5)
                     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*self.video_rtsp_decode_format))
-                    self.get_logger().info(f"Connected to RTSP stream: {self.video_rtsp_url}")
+                    self.get_logger().info(f"Connected to video RTSP stream: {self.video_rtsp_url}")
 
                 ret, frame = cap.read()
                 if ret and frame is not None:
                     self.last_video_rtsp_time = time.time()
-                    self.get_logger().info("Received RTSP frame")
+                    self.get_logger().info("Received video RTSP frame")
                 else:
-                    self.get_logger().info("Failed to read RTSP frame")
+                    self.get_logger().info("Failed to read video RTSP frame")
                     if cap is not None:
                         cap.release()
                         cap = None
@@ -129,7 +129,7 @@ class WatchSensor(Node):
                 time.sleep(5.0)
 
             except Exception as e:
-                self.get_logger().error(f"RTSP monitoring error: {str(e)}")
+                self.get_logger().error(f"Video RTSP monitoring error: {str(e)}")
                 if cap is not None:
                     cap.release()
                     cap = None
@@ -156,7 +156,7 @@ class WatchSensor(Node):
 
                 if result.returncode == 0 and 'audio' in result.stdout:
                     self.last_audio_rtsp_time = time.time()
-                    self.get_logger().debug("Audio RTSP stream is accessible")
+                    self.get_logger().info("Audio RTSP stream is accessible")
                 else:
                     self.get_logger().info("Audio RTSP stream not accessible or no audio stream found")
 

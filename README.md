@@ -1,6 +1,6 @@
 # Unitree SDK
 
-A ROS 2 package that provides SLAM (Simultaneous Localization and Mapping) capabilities for the Unitree Go2 robot using an RPLiDAR sensor, the SLAM Toolbox and the Nav2 stack.
+A ROS 2 package that provides SLAM (Simultaneous Localization and Mapping) capabilities for the Unitree Go2  and G1 robots using an RPLiDAR sensor, the SLAM Toolbox and the Nav2 stack.
 
 ## Overview
 
@@ -19,6 +19,8 @@ This package integrates:
 - **Robot Control**: Direct integration with Unitree Go2 movement commands
 - **Visualization**: Pre-configured RViz setup for monitoring
 - **Transform Management**: Automatic handling of coordinate frame transforms
+- **Auto Charging**: AprilTag-based visual docking combined with Nav2 navigation
+- **3D Slam Map**: Builds a 3D SLAM map to help the robot navigate
 
 ## Prerequisites
 
@@ -30,22 +32,18 @@ This package integrates:
 
 ### 0. Hardware setup:
 
-We provide two options for placing the RPLiDAR on the Unitree Go2 robot:
-   - **Option 1**: Mount the RPLiDAR on the head of the robot using a 3D-printed mount.
+You can place the RPLiDAR at the center of the robot using a 3D-printed mount.
 
-     ![Head example](./models/head.jpg)
+     ![Front View](./models/body.jpg)
+     ![Side View](./models/head.jpg)
 
-   - **Option 2**: Mount the RPLidar at the center of the robot using a 3D-printed mount.
-
-     ![Body example](./models/body.jpg)
-
-You can find the 3D model for the mount in the `models` directory of this repository.
+You can find the 3D model for the mount in the `models` directory of this repository. We'll shortly be releasing the BOM and details on DIY for it. Stay tuned!
 
 ### 1. Clone this repository into your ROS 2 workspace:
 
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/OpenmindAGI/unitree_go2_ros2_sdk.git
+git clone https://github.com/OpenmindAGI/unitree_sdk.git
 ```
 
 ### 2. Install dependencies:
@@ -314,11 +312,11 @@ curl --location 'http://localhost:5000/stop/nav2' \
 
 ## Development Guidance
 
-This section provides guidance for developers working on the new OM backpack system.
+This section provides guidance for developers working on the new OM brainpack system.
 
-![backpack](./models/backpack.jpg)
+![brainpack](./models/backpack.jpg)
 
-You can connect your Linux machine to one of the Ethernet ports of the OM backpack.
+You can connect your Linux machine to one of the Ethernet ports of the OM brainpack.
 
 Open the network settings and find the network interface that the robot is connected to. In IPv4 settings, change the IPv4 mode to manual, set the address to 192.168.123.100, and set the mask to 255.255.255.0. After completion, click apply and wait for the network to reconnect.
 

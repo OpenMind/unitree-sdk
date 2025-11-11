@@ -1,7 +1,9 @@
 import rclpy
+import json
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from unitree_api.msg import Request, RequestHeader, RequestIdentity
+from unitree_go.msg import SportModeState
 
 class Go2SportAction(Node):
     """
@@ -12,6 +14,7 @@ class Go2SportAction(Node):
 
         self.SPORT_API_ID_RECOVERYSTAND = 1006
         self.SPORT_API_ID_STANDDOWN = 1005
+        self.SPORT_API_ID_CLASSICWALK = 2049
 
         self.joy_subscription = self.create_subscription(
             Joy,
@@ -23,6 +26,13 @@ class Go2SportAction(Node):
         self.sport_publisher = self.create_publisher(
             Request,
             "/api/sport/request",
+            10
+        )
+
+        self.sport_mode_subscription = self.create_subscription(
+            SportModeState,
+            "/sportmodestate",
+            self.sport_mode_callback,
             10
         )
 
@@ -67,6 +77,28 @@ class Go2SportAction(Node):
         request_msg.parameter = ""
         self.sport_publisher.publish(request_msg)
         self.get_logger().debug(f"Sent sport command with API ID: {api_id}")
+
+    def sport_mode_callback(self, msg: SportModeState):
+        """
+        Callback function for sport mode messages.
+
+        Parameters:
+        -----------
+        msg : unitree_go.msg.SportModeState
+            The incoming sport mode state message.
+        """
+        # The robot is in agile mode, which is unstable due to the payload on its back.
+        if msg.error_code == 100:
+            self.get_logger().warn("Robot is in Agile mode, switching to classic mode recommended.")
+
+            request_msg = Request()
+            request_msg.header = RequestHeader()
+            request_msg.header.identity = RequestIdentity()
+            request_msg.header.identity.api_id = self.SPORT_API_ID_CLASSICWALK
+
+            request_msg.parameter = json.dumps({"data": True})
+            self.sport_publisher.publish(request_msg)
+            self.get_logger().info("Sent command to switch to Classic Walk mode")
 
 def main(args=None):
     rclpy.init(args=args)

@@ -34,8 +34,8 @@ This package integrates:
 
 You can place the RPLiDAR at the center of the robot using a 3D-printed mount.
 
-     ![Front View](./models/body.png)
-     ![Side View](./models/head.png)
+  ![Front View](./models/body.png)
+  ![Side View](./models/head.png)
 
 You can find the 3D model for the mount in the `models` directory of this repository. We'll shortly be releasing the BOM and details on DIY for it. Stay tuned!
 

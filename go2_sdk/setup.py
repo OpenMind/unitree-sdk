@@ -37,6 +37,7 @@ setup(
             'crsf_controller = go2_sdk.crsf_controller:main',
             'go2_camera_stream = go2_sdk.go2_camera_stream:main',
             'd435_camera_stream = go2_sdk.d435_camera_stream:main',
+            'go2_lidar_localization = go2_sdk.go2_lidar_localization:main',
         ],
     },
 )

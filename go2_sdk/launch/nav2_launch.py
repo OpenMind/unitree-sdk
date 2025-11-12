@@ -270,14 +270,29 @@ def generate_launch_description():
             parameters=[
                 {'use_sim_time': False},
                 {'autostart': True},
-                {'node_names': ['map_server', 'amcl']}]
+                # {'node_names': ['map_server', 'amcl']}]
+                {'node_names': ['map_server']}]
         ),
 
+        # Node(
+        #     package='nav2_amcl',
+        #     executable='amcl',
+        #     name='amcl',
+        #     output='screen',
+        #     parameters=[nav2_config_file]
+        # )
+
+        # Custom Lidar Localization Node
         Node(
-            package='nav2_amcl',
-            executable='amcl',
-            name='amcl',
+            package='go2_sdk',
+            executable='go2_lidar_localization',
+            name='go2_lidar_localization',
             output='screen',
-            parameters=[nav2_config_file]
-        )
+            parameters=[{
+                'base_frame': 'base_link',
+                'odom_frame': 'odom',
+                'laser_frame': 'laser',
+                'laser_topic': 'scan'
+            }]
+        ),
     ])

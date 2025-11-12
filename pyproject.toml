@@ -2,6 +2,10 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["go2_sdk*", "go2_auto_dock*", "orchestrator*", "watchdog*"]
+exclude = ["*.tests", "*.tests.*", "tests.*", "tests"]
+
 [project]
 name = "unitree-sdk"
 version = "1.0.0"

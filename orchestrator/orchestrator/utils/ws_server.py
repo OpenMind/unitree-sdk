@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import threading
-from queue import Queue, Empty
+from queue import Empty, Queue
 from typing import Callable, Optional, Set, Union
 
 from websockets import ConnectionClosed, WebSocketServerProtocol
@@ -22,7 +22,9 @@ class WebSocketServer:
         The port number to listen on, by default 6123
     """
 
-    def __init__(self, logger: logging.Logger, host: str = "localhost", port: int = 6123):
+    def __init__(
+        self, logger: logging.Logger, host: str = "localhost", port: int = 6123
+    ):
         self.host = host
         self.port = port
         self.connections: Set[WebSocketServerProtocol] = set()
@@ -102,15 +104,15 @@ class WebSocketServer:
         with self._lock:
             self.connections.add(websocket)
 
-        self.logger.info(f"Client connected: {connection_id} (total: {len(self.connections)})")
+        self.logger.info(
+            f"Client connected: {connection_id} (total: {len(self.connections)})"
+        )
 
         try:
             async for message in websocket:
                 if self.message_callback:
                     threading.Thread(
-                        target=self.message_callback,
-                        args=(message,),
-                        daemon=True
+                        target=self.message_callback, args=(message,), daemon=True
                     ).start()
         except ConnectionClosed:
             self.logger.info(f"Client disconnected: {connection_id}")
@@ -119,7 +121,9 @@ class WebSocketServer:
         finally:
             with self._lock:
                 self.connections.discard(websocket)
-            self.logger.info(f"Client removed: {connection_id} (total: {len(self.connections)})")
+            self.logger.info(
+                f"Client removed: {connection_id} (total: {len(self.connections)})"
+            )
 
     async def _run(self):
         """
@@ -149,6 +153,7 @@ class WebSocketServer:
         """
         Start the WebSocket server in a separate thread.
         """
+
         def run_server():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

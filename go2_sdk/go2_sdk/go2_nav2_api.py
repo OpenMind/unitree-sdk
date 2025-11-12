@@ -1,14 +1,15 @@
-import rclpy
 import math
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+import threading
+from typing import Optional
+
+import rclpy
+from action_msgs.msg import GoalStatusArray
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
-import threading
-from typing import Optional
-from action_msgs.msg import GoalStatusArray
 from nav_msgs.msg import OccupancyGrid
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 status_map = {
     0: "UNKNOWN",
@@ -17,54 +18,43 @@ status_map = {
     3: "CANCELING",
     4: "SUCCEEDED",
     5: "CANCELED",
-    6: "ABORTED"
+    6: "ABORTED",
 }
+
 
 class Go2APINode(Node):
     """
     A ROS2 node that provides a REST API for interacting with the Unitree Go2 robot.
     """
+
     def __init__(self):
         super().__init__("go2_nav2_api_node")
 
         self.pose_subscription = self.create_subscription(
-            PoseStamped,
-            '/om/pose',
-            self.pose_callback,
-            10
+            PoseStamped, "/om/pose", self.pose_callback, 10
         )
 
-        self.pose_publisher = self.create_publisher(
-            PoseStamped,
-            '/goal_pose',
-            10
-        )
+        self.pose_publisher = self.create_publisher(PoseStamped, "/goal_pose", 10)
 
         self.amcl_subscription = self.create_subscription(
-            PoseWithCovarianceStamped,
-            '/amcl_pose',
-            self.amcl_callback,
-            10
+            PoseWithCovarianceStamped, "/amcl_pose", self.amcl_callback, 10
         )
 
         self.nav2_status_subscription = self.create_subscription(
             GoalStatusArray,
-            '/navigate_to_pose/_action/status',
+            "/navigate_to_pose/_action/status",
             self.goal_status_callback,
-            10
+            10,
         )
 
         map_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
-            depth=1
+            depth=1,
         )
 
         self.map_subscription = self.create_subscription(
-            OccupancyGrid,
-            '/map',
-            self.map_callback,
-            map_qos
+            OccupancyGrid, "/map", self.map_callback, map_qos
         )
 
         self.pose_data: Optional[PoseWithCovarianceStamped] = None
@@ -84,17 +74,18 @@ class Go2APINode(Node):
         """
         Run the Flask application in a separate thread.
         """
-        self.app.run(host='0.0.0.0', port=5001, use_reloader=False)
+        self.app.run(host="0.0.0.0", port=5001, use_reloader=False)
 
     def register_routes(self):
         """
         Register the API routes.
         """
-        @self.app.route('/api/status', methods=['GET'])
+
+        @self.app.route("/api/status", methods=["GET"])
         def get_status():
             return jsonify({"status": "OK", "message": "Go2 API is running"}), 200
 
-        @self.app.route('/api/pose', methods=['GET'])
+        @self.app.route("/api/pose", methods=["GET"])
         def get_pose():
             """
             Get the current pose of the robot.
@@ -115,45 +106,57 @@ class Go2APINode(Node):
                     "z": round(self.pose_data.pose.pose.orientation.z, 5),
                     "w": round(self.pose_data.pose.pose.orientation.w, 5),
                 },
-                "covariance": self.pose_data.pose.covariance.tolist()
+                "covariance": self.pose_data.pose.covariance.tolist(),
             }
 
             return jsonify(pose), 200
 
-        @self.app.route('/api/move_to_pose', methods=['POST'])
+        @self.app.route("/api/move_to_pose", methods=["POST"])
         def move_to_pose():
             """
             Move the robot to a specified pose.
             Expects a JSON object with 'position' and 'orientation'.
             """
             data = request.json
-            if not data or 'position' not in data or 'orientation' not in data:
+            if not data or "position" not in data or "orientation" not in data:
                 return jsonify({"error": "Invalid input"}), 400
 
-            position = data['position']
-            orientation = data['orientation']
+            position = data["position"]
+            orientation = data["orientation"]
 
-            if not all(k in position for k in ('x', 'y', 'z')) or not all(k in orientation for k in ('x', 'y', 'z', 'w')):
-                return jsonify({"error": "Position and orientation must contain x, y, z, and w"}), 400
+            if not all(k in position for k in ("x", "y", "z")) or not all(
+                k in orientation for k in ("x", "y", "z", "w")
+            ):
+                return (
+                    jsonify(
+                        {
+                            "error": "Position and orientation must contain x, y, z, and w"
+                        }
+                    ),
+                    400,
+                )
 
             pose_msg = PoseStamped()
             pose_msg.header.stamp = self.get_clock().now().to_msg()
-            pose_msg.header.frame_id = 'map'
-            pose_msg.pose.position.x = position['x']
-            pose_msg.pose.position.y = position['y']
-            pose_msg.pose.position.z = position['z']
-            pose_msg.pose.orientation.x = orientation['x']
-            pose_msg.pose.orientation.y = orientation['y']
-            pose_msg.pose.orientation.z = orientation['z']
-            pose_msg.pose.orientation.w = orientation['w']
+            pose_msg.header.frame_id = "map"
+            pose_msg.pose.position.x = position["x"]
+            pose_msg.pose.position.y = position["y"]
+            pose_msg.pose.position.z = position["z"]
+            pose_msg.pose.orientation.x = orientation["x"]
+            pose_msg.pose.orientation.y = orientation["y"]
+            pose_msg.pose.orientation.z = orientation["z"]
+            pose_msg.pose.orientation.w = orientation["w"]
 
             self.pose_publisher.publish(pose_msg)
 
             self.get_logger().info(f"Moving to pose: {pose_msg.pose}")
 
-            return jsonify({"status": "success", "message": "Moving to specified pose"}), 200
+            return (
+                jsonify({"status": "success", "message": "Moving to specified pose"}),
+                200,
+            )
 
-        @self.app.route('/api/amcl_variance', methods=['GET'])
+        @self.app.route("/api/amcl_variance", methods=["GET"])
         def get_amcl_variance():
             """
             Get the AMCL pose variance.
@@ -163,20 +166,25 @@ class Go2APINode(Node):
 
             try:
                 covariance = self.pose_data.pose.covariance
-                x_uncertainty = round(covariance[0] ** (1/2), 5)
-                y_uncertainty = round(covariance[7] ** (1/2), 5)
-                yaw_uncertainty = round(covariance[35] ** (1/2) / math.pi * 180, 5)
+                x_uncertainty = round(covariance[0] ** (1 / 2), 5)
+                y_uncertainty = round(covariance[7] ** (1 / 2), 5)
+                yaw_uncertainty = round(covariance[35] ** (1 / 2) / math.pi * 180, 5)
 
-                return jsonify({
-                    "x_uncertainty": x_uncertainty,
-                    "y_uncertainty": y_uncertainty,
-                    "yaw_uncertainty": yaw_uncertainty
-                }), 200
+                return (
+                    jsonify(
+                        {
+                            "x_uncertainty": x_uncertainty,
+                            "y_uncertainty": y_uncertainty,
+                            "yaw_uncertainty": yaw_uncertainty,
+                        }
+                    ),
+                    200,
+                )
 
             except IndexError:
                 return jsonify({"error": "Invalid covariance data"}), 500
 
-        @self.app.route('/api/nav2_status', methods=['GET'])
+        @self.app.route("/api/nav2_status", methods=["GET"])
         def get_nav2_status():
             """
             Get the status of the Nav2 stack.
@@ -188,21 +196,21 @@ class Go2APINode(Node):
 
             for status in self.nav2_status.status_list:
                 uuid_bytes = status.goal_info.goal_id.uuid
-                goal_id = ''.join(f'{b:02x}' for b in uuid_bytes)
+                goal_id = "".join(f"{b:02x}" for b in uuid_bytes)
 
                 status_info = {
                     "goal_id": goal_id,
                     "status": status_map.get(status.status, "UNKNOWN"),
                     "timestamp": {
                         "sec": status.goal_info.stamp.sec,
-                        "nanosec": status.goal_info.stamp.nanosec
-                    }
+                        "nanosec": status.goal_info.stamp.nanosec,
+                    },
                 }
                 status_list.append(status_info)
 
             return jsonify({"nav2_status": status_list}), 200
 
-        @self.app.route('/api/map', methods=['GET'])
+        @self.app.route("/api/map", methods=["GET"])
         def get_map():
             """
             Get the current map data.
@@ -213,7 +221,8 @@ class Go2APINode(Node):
 
             map_info = {
                 "map_metadata": {
-                    "map_load_time": self.map_data.info.map_load_time.sec + self.map_data.info.map_load_time.nanosec * 1e-9,
+                    "map_load_time": self.map_data.info.map_load_time.sec
+                    + self.map_data.info.map_load_time.nanosec * 1e-9,
                     "resolution": self.map_data.info.resolution,
                     "width": self.map_data.info.width,
                     "height": self.map_data.info.height,
@@ -221,17 +230,17 @@ class Go2APINode(Node):
                         "position": {
                             "x": self.map_data.info.origin.position.x,
                             "y": self.map_data.info.origin.position.y,
-                            "z": self.map_data.info.origin.position.z
+                            "z": self.map_data.info.origin.position.z,
                         },
                         "orientation": {
                             "x": self.map_data.info.origin.orientation.x,
                             "y": self.map_data.info.origin.orientation.y,
                             "z": self.map_data.info.origin.orientation.z,
-                            "w": self.map_data.info.origin.orientation.w
-                        }
-                    }
+                            "w": self.map_data.info.origin.orientation.w,
+                        },
+                    },
                 },
-                "data": list(self.map_data.data)
+                "data": list(self.map_data.data),
             }
 
             return jsonify(map_info), 200
@@ -294,7 +303,10 @@ class Go2APINode(Node):
             The incoming OccupancyGrid message containing the map data.
         """
         self.map_data = msg
-        self.get_logger().info(f"Received map with dimensions: {msg.info.width}x{msg.info.height}")
+        self.get_logger().info(
+            f"Received map with dimensions: {msg.info.width}x{msg.info.height}"
+        )
+
 
 def main(args=None):
     """

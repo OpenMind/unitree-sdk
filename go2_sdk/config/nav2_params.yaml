@@ -125,7 +125,7 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.25  
+      yaw_goal_tolerance: 0.25
 
     # MPPI Controller - optimized for Unitree Go2
     FollowPath:
@@ -148,33 +148,33 @@ controller_server:
       motion_model: "DiffDrive"  # Use DiffDrive for Go2
       visualize: False  # Set to True for debugging
       regenerate_noises: False
-      
+
       # Cost function weights (tune these for your needs)
       critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
-      
+
       ConstraintCritic:
         enabled: True
         cost_power: 1
         cost_weight: 4.0
-      
+
       GoalCritic:
         enabled: True
         cost_power: 1
         cost_weight: 5.0  # High weight for reaching goal
         threshold_to_consider: 1.4
-      
+
       GoalAngleCritic:
         enabled: True
         cost_power: 1
         cost_weight: 15.0  # Important for final orientation
         threshold_to_consider: 0.5
-      
+
       PreferForwardCritic:
         enabled: True
         cost_power: 1
         cost_weight: 3.0  # Penalize backward motion
         threshold_to_consider: 0.5
-      
+
       # Obstacle and path following
       CostCritic:
         enabled: True
@@ -185,7 +185,7 @@ controller_server:
         collision_cost: 1000000.0
         near_goal_distance: 0.5
         trajectory_point_step: 2
-      
+
       PathAlignCritic:
         enabled: True
         cost_power: 1
@@ -195,14 +195,14 @@ controller_server:
         threshold_to_consider: 0.5
         offset_from_furthest: 20
         use_path_orientations: False
-      
+
       PathFollowCritic:
         enabled: True
         cost_power: 1
         cost_weight: 5.0
         offset_from_furthest: 5
         threshold_to_consider: 1.4
-      
+
       PathAngleCritic:
         enabled: True
         cost_power: 1
@@ -214,7 +214,7 @@ controller_server:
 
       # Noise generator settings
       noise_generator_config:
-        default: 
+        default:
           time_steps: 56
           batch_size: 2000
           vx_std: 0.2
@@ -240,7 +240,7 @@ local_costmap:
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
-      
+
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -255,7 +255,7 @@ local_costmap:
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
-      
+
       # STVL for 4D LiDAR pointcloud (optimized for ground obstacles)
       stvl_layer:
         plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
@@ -276,10 +276,10 @@ local_costmap:
         map_save_duration: 60.0
         combination_method: 1  # 0=max, 1=override
         update_footprint_enabled: True
-        
+
         # 4D LiDAR as observation source
         observation_sources: lidar_4d
-        
+
         # 4D LiDAR pointcloud configuration (Unitree Go2)
         lidar_4d:
           data_type: PointCloud2
@@ -296,12 +296,12 @@ local_costmap:
           clear_after_reading: True
           enabled: True
           model_type: 1  # 1=3d_lidar (for 4D LiDAR)
-          
+
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 1.5
         inflation_radius: 0.23 # lower inflation radius for tight space navigation
-      
+
       always_send_full_costmap: True
 
 global_costmap:
@@ -316,7 +316,7 @@ global_costmap:
       resolution: 0.1
       track_unknown_space: True
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      
+
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -331,16 +331,16 @@ global_costmap:
           raytrace_min_range: 0.0
           obstacle_max_range: 3.5
           obstacle_min_range: 0.0
-      
+
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
-      
+
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.3
-      
+
       always_send_full_costmap: True
 
 map_server:

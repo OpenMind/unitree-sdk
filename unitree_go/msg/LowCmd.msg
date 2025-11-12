@@ -12,4 +12,3 @@ uint8[2] fan
 uint8 gpio
 uint32 reserve
 uint32 crc
-

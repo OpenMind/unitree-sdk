@@ -1,7 +1,8 @@
+from typing import Any, Dict, Optional
+
 import rclpy
 import tf2_ros
 from tf2_ros import TransformException
-from typing import Optional, Dict, Any
 
 
 class TransformService:
@@ -36,24 +37,24 @@ class TransformService:
         """
         try:
             transform = self.tf_buffer.lookup_transform(
-                'map',
-                'base_link',
+                "map",
+                "base_link",
                 rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=1.0)
+                timeout=rclpy.duration.Duration(seconds=1.0),
             )
 
             pose = {
                 "position": {
                     "x": transform.transform.translation.x,
                     "y": transform.transform.translation.y,
-                    "z": transform.transform.translation.z
+                    "z": transform.transform.translation.z,
                 },
                 "orientation": {
                     "x": transform.transform.rotation.x,
                     "y": transform.transform.rotation.y,
                     "z": transform.transform.rotation.z,
-                    "w": transform.transform.rotation.w
-                }
+                    "w": transform.transform.rotation.w,
+                },
             }
 
             return pose
@@ -63,7 +64,9 @@ class TransformService:
                 self.logger.error(f"Failed to get transform: {str(e)}")
             return None
 
-    def get_transform(self, target_frame: str, source_frame: str, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
+    def get_transform(
+        self, target_frame: str, source_frame: str, timeout: float = 1.0
+    ) -> Optional[Dict[str, Any]]:
         """
         Get transform between two frames.
 
@@ -86,32 +89,34 @@ class TransformService:
                 target_frame,
                 source_frame,
                 rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=timeout)
+                timeout=rclpy.duration.Duration(seconds=timeout),
             )
 
             return {
                 "translation": {
                     "x": transform.transform.translation.x,
                     "y": transform.transform.translation.y,
-                    "z": transform.transform.translation.z
+                    "z": transform.transform.translation.z,
                 },
                 "rotation": {
                     "x": transform.transform.rotation.x,
                     "y": transform.transform.rotation.y,
                     "z": transform.transform.rotation.z,
-                    "w": transform.transform.rotation.w
+                    "w": transform.transform.rotation.w,
                 },
                 "header": {
                     "frame_id": transform.header.frame_id,
                     "stamp": {
                         "sec": transform.header.stamp.sec,
-                        "nanosec": transform.header.stamp.nanosec
-                    }
+                        "nanosec": transform.header.stamp.nanosec,
+                    },
                 },
-                "child_frame_id": transform.child_frame_id
+                "child_frame_id": transform.child_frame_id,
             }
 
         except TransformException as e:
             if self.logger:
-                self.logger.error(f"Failed to get transform from {source_frame} to {target_frame}: {str(e)}")
+                self.logger.error(
+                    f"Failed to get transform from {source_frame} to {target_frame}: {str(e)}"
+                )
             return None

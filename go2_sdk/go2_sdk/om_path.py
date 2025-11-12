@@ -3,10 +3,10 @@ import math
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from sensor_msgs.msg import LaserScan, PointCloud
 
-from sensor_msgs.msg import LaserScan
-from sensor_msgs.msg import PointCloud
 from om_api.msg import Paths
+
 
 def create_straight_line_path_from_angle(angle_degrees, length=1.0, num_points=10):
     """Create a straight line path from origin at specified angle and length"""
@@ -27,6 +27,7 @@ path_length = 1.05  # meters
 paths = [
     create_straight_line_path_from_angle(angle, path_length) for angle in path_angles
 ]
+
 
 class OMPath(Node):
     def __init__(self):
@@ -52,14 +53,10 @@ class OMPath(Node):
             PointCloud,
             "/camera/realsense2_camera_node/depth/obstacle_point",
             self.obstacle_callback,
-            10
+            10,
         )
 
-        self.paths_pub = self.create_publisher(
-            Paths,
-            "/om/paths",
-            10
-        )
+        self.paths_pub = self.create_publisher(Paths, "/om/paths", 10)
 
         self.get_logger().info("OMPath node started")
 
@@ -69,7 +66,9 @@ class OMPath(Node):
         angles = list(
             map(
                 lambda x: 360.0 * (x + math.pi) / (2 * math.pi),
-                np.arange(self.scan.angle_min, self.scan.angle_max, self.scan.angle_increment),
+                np.arange(
+                    self.scan.angle_min, self.scan.angle_max, self.scan.angle_increment
+                ),
             )
         )
         angles_final = np.flip(angles)
@@ -80,7 +79,6 @@ class OMPath(Node):
         complexes = []
 
         for angle, distance in data:
-
             d_m = distance
 
             # don't worry about distant objects
@@ -213,6 +211,7 @@ class OMPath(Node):
 
         # Return the distance from the point to the closest point on the line segment
         return math.sqrt((px - closest_x) ** 2 + (py - closest_y) ** 2)
+
 
 def main(args=None):
     rclpy.init(args=args)

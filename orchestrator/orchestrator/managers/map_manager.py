@@ -1,6 +1,7 @@
 import os
 import subprocess
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from ..models.data_models import MapInfo
 
 
@@ -24,7 +25,9 @@ class MapManager:
         self.logger = logger
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
 
-    def save_map(self, map_name: str, map_directory: Optional[str] = None) -> Dict[str, Any]:
+    def save_map(
+        self, map_name: str, map_directory: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Save the current map using both slam_toolbox and standard ROS2 formats.
 
@@ -56,20 +59,27 @@ class MapManager:
         # Save pose graph
         try:
             cmd_posegraph = [
-                "ros2", "service", "call",
+                "ros2",
+                "service",
+                "call",
                 "/slam_toolbox/serialize_map",
                 "slam_toolbox/srv/SerializePoseGraph",
-                f"{{filename: '{map_path}'}}"
+                f"{{filename: '{map_path}'}}",
             ]
 
             if self.logger:
                 self.logger.info("Saving pose graph...")
-            result = subprocess.run(cmd_posegraph, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(
+                cmd_posegraph, capture_output=True, text=True, timeout=30
+            )
 
             if "result=0" in result.stdout.lower():
-                posegraph_files = [f for f in os.listdir(map_folder_path)
-                                 if f.startswith(map_name) and
-                                 (f.endswith('.posegraph') or f.endswith('.data'))]
+                posegraph_files = [
+                    f
+                    for f in os.listdir(map_folder_path)
+                    if f.startswith(map_name)
+                    and (f.endswith(".posegraph") or f.endswith(".data"))
+                ]
                 if posegraph_files:
                     files_created.extend(posegraph_files)
                     if self.logger:
@@ -85,10 +95,12 @@ class MapManager:
         # Save YAML map
         try:
             cmd = [
-                "ros2", "service", "call",
+                "ros2",
+                "service",
+                "call",
                 "/slam_toolbox/save_map",
                 "slam_toolbox/srv/SaveMap",
-                f"{{name: {{data: '{map_path}'}}}}"
+                f"{{name: {{data: '{map_path}'}}}}",
             ]
 
             if self.logger:
@@ -96,9 +108,12 @@ class MapManager:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             if result.returncode == 0:
-                yaml_files = [f for f in os.listdir(map_folder_path)
-                             if f.startswith(map_name) and
-                             (f.endswith('.yaml') or f.endswith('.pgm'))]
+                yaml_files = [
+                    f
+                    for f in os.listdir(map_folder_path)
+                    if f.startswith(map_name)
+                    and (f.endswith(".yaml") or f.endswith(".pgm"))
+                ]
                 if yaml_files:
                     files_created.extend(yaml_files)
                     if self.logger:
@@ -116,7 +131,7 @@ class MapManager:
                 "status": "success",
                 "message": f"Map saved successfully as {map_name}",
                 "files_created": files_created,
-                "base_path": map_path
+                "base_path": map_path,
             }
         elif files_created and errors:
             return {
@@ -124,13 +139,13 @@ class MapManager:
                 "message": f"Map partially saved as {map_name}. Some formats failed.",
                 "files_created": files_created,
                 "base_path": map_path,
-                "errors": errors
+                "errors": errors,
             }
         else:
             return {
                 "status": "error",
                 "message": "Map save failed completely",
-                "errors": errors
+                "errors": errors,
             }
 
     def list_maps(self) -> List[MapInfo]:
@@ -146,16 +161,21 @@ class MapManager:
         for root, dirs, files in os.walk(self.maps_directory):
             for dir_name in dirs:
                 dir_path = os.path.join(root, dir_name)
-                map_files = [f for f in os.listdir(dir_path)
-                           if f.startswith(dir_name) and
-                           (f.endswith('.yaml') or f.endswith('.pgm') or
-                            f.endswith('.posegraph') or f.endswith('.data'))]
+                map_files = [
+                    f
+                    for f in os.listdir(dir_path)
+                    if f.startswith(dir_name)
+                    and (
+                        f.endswith(".yaml")
+                        or f.endswith(".pgm")
+                        or f.endswith(".posegraph")
+                        or f.endswith(".data")
+                    )
+                ]
                 if map_files:
-                    maps.append(MapInfo(
-                        map_name=dir_name,
-                        files=map_files,
-                        path=dir_path
-                    ))
+                    maps.append(
+                        MapInfo(map_name=dir_name, files=map_files, path=dir_path)
+                    )
         return maps
 
     def delete_map(self, map_name: str) -> Dict[str, str]:
@@ -172,7 +192,7 @@ class MapManager:
         Dict[str, str]
             Dictionary containing status and message.
         """
-        if not map_name or any(char in map_name for char in ['/', '\\', '..', ' ']):
+        if not map_name or any(char in map_name for char in ["/", "\\", "..", " "]):
             return {"status": "error", "message": "Invalid map name"}
 
         map_path = os.path.join(self.maps_directory, map_name)

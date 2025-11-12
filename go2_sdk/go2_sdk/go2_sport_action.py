@@ -1,14 +1,18 @@
-import rclpy
 import json
+
+import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
+
 from unitree_api.msg import Request, RequestHeader, RequestIdentity
 from unitree_go.msg import SportModeState
+
 
 class Go2SportAction(Node):
     """
     A ROS2 node that interfaces with the Go2 sport action system.
     """
+
     def __init__(self):
         super().__init__("go2_sport_action_node")
 
@@ -17,23 +21,13 @@ class Go2SportAction(Node):
         self.SPORT_API_ID_CLASSICWALK = 2049
 
         self.joy_subscription = self.create_subscription(
-            Joy,
-            "/joy",
-            self.joy_callback,
-            10
+            Joy, "/joy", self.joy_callback, 10
         )
 
-        self.sport_publisher = self.create_publisher(
-            Request,
-            "/api/sport/request",
-            10
-        )
+        self.sport_publisher = self.create_publisher(Request, "/api/sport/request", 10)
 
         self.sport_mode_subscription = self.create_subscription(
-            SportModeState,
-            "/sportmodestate",
-            self.sport_mode_callback,
-            10
+            SportModeState, "/sportmodestate", self.sport_mode_callback, 10
         )
 
         self.get_logger().info("Go2 Sport Action Node initialized")
@@ -89,7 +83,9 @@ class Go2SportAction(Node):
         """
         # The robot is in agile mode, which is unstable due to the payload on its back.
         if msg.error_code == 100:
-            self.get_logger().warn("Robot is in Agile mode, switching to classic mode recommended.")
+            self.get_logger().warn(
+                "Robot is in Agile mode, switching to classic mode recommended."
+            )
 
             request_msg = Request()
             request_msg.header = RequestHeader()
@@ -99,6 +95,7 @@ class Go2SportAction(Node):
             request_msg.parameter = json.dumps({"data": True})
             self.sport_publisher.publish(request_msg)
             self.get_logger().info("Sent command to switch to Classic Walk mode")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -111,6 +108,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

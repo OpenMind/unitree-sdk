@@ -1,6 +1,7 @@
 import time
 from datetime import datetime
 from typing import Optional
+
 from ..managers.process_manager import ProcessManager
 from ..models.data_models import ChargingStatus
 
@@ -52,7 +53,10 @@ class ChargingManager:
                     self.logger.info("Charging detected, confirming...")
             else:
                 # Check if confirmation period has elapsed
-                if time.time() - self.charging_confirmed_time >= self.charging_confirmation_duration:
+                if (
+                    time.time() - self.charging_confirmed_time
+                    >= self.charging_confirmation_duration
+                ):
                     self.is_charging = True
                     self.charging_confirmed_time = None
                     if self.logger:
@@ -68,7 +72,7 @@ class ChargingManager:
             if self.charging_confirmed_time is not None:
                 self.charging_confirmed_time = None
 
-    def start_dock_sequence(self, launch_file: str = 'go2_charge.launch.py') -> bool:
+    def start_dock_sequence(self, launch_file: str = "go2_charge.launch.py") -> bool:
         """
         Start autonomous docking sequence to charger.
 
@@ -134,7 +138,7 @@ class ChargingManager:
             battery_soc=self.battery_soc,
             battery_current=self.battery_current,
             dock_process_running=self.process_manager.is_running(),
-            charging_confirmation_pending=self.charging_confirmed_time is not None
+            charging_confirmation_pending=self.charging_confirmed_time is not None,
         )
 
     def is_dock_process_running(self) -> bool:

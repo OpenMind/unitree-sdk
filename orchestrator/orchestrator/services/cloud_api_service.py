@@ -1,10 +1,11 @@
 import os
+from typing import Any, Dict, Optional
+
 import requests
-from typing import Dict, Any, Optional
 
-env = os.getenv('ENV', 'production')
+env = os.getenv("ENV", "production")
 
-if env == 'development':
+if env == "development":
     base_url = "https://api-dev.openmind.org/api/core"
 else:
     base_url = "https://api.openmind.org/api/core"
@@ -25,7 +26,7 @@ class CloudAPIService:
             Logger instance for logging messages.
         """
         self.logger = logger
-        self.api_key = os.getenv('OM_API_KEY')
+        self.api_key = os.getenv("OM_API_KEY")
 
         if not self.api_key:
             self.logger.error("OM_API_KEY environment variable not set!")
@@ -33,11 +34,13 @@ class CloudAPIService:
         self.base_url = base_url
 
         self.headers = {
-            'Authorization': f'Bearer {self.api_key}' if self.api_key else '',
-            'Content-Type': 'application/json'
+            "Authorization": f"Bearer {self.api_key}" if self.api_key else "",
+            "Content-Type": "application/json",
         }
 
-    def get_headers(self, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def get_headers(
+        self, custom_headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, str]:
         """
         Get headers for API requests.
 
@@ -63,7 +66,7 @@ class CloudAPIService:
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         custom_headers: Optional[Dict[str, str]] = None,
-        timeout: int = 30
+        timeout: int = 30,
     ) -> Dict[str, Any]:
         """
         Make an HTTP request to the cloud API.
@@ -103,14 +106,14 @@ class CloudAPIService:
                 json=data,
                 params=params,
                 headers=headers,
-                timeout=timeout
+                timeout=timeout,
             )
 
             result = {
                 "status": "success" if response.ok else "error",
                 "status_code": response.status_code,
                 "message": f"{method} request completed",
-                "url": url
+                "url": url,
             }
 
             try:
@@ -146,7 +149,9 @@ class CloudAPIService:
             self.logger.error(error_msg)
             return {"status": "error", "message": error_msg}
 
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> Dict[str, Any]:
         """
         Make a GET request.
 
@@ -166,7 +171,9 @@ class CloudAPIService:
         """
         return self.make_request("GET", endpoint, params=params, **kwargs)
 
-    def post(self, endpoint: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def post(
+        self, endpoint: str, data: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> Dict[str, Any]:
         """
         Make a POST request.
 
@@ -186,7 +193,9 @@ class CloudAPIService:
         """
         return self.make_request("POST", endpoint, data=data, **kwargs)
 
-    def put(self, endpoint: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def put(
+        self, endpoint: str, data: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> Dict[str, Any]:
         """
         Make a PUT request.
 

@@ -15,5 +15,3 @@ float32[2] joystick
 uint8 error_state
 uint8 buttons
 uint8 enabled_from_app
-
-

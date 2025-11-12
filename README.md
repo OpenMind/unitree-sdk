@@ -34,8 +34,8 @@ This package integrates:
 
 You can place the RPLiDAR at the center of the robot using a 3D-printed mount.
 
-     ![Front View](./models/body.jpg)
-     ![Side View](./models/head.jpg)
+  ![Front View](./models/body.png)
+  ![Side View](./models/head.png)
 
 You can find the 3D model for the mount in the `models` directory of this repository. We'll shortly be releasing the BOM and details on DIY for it. Stay tuned!
 
@@ -314,7 +314,7 @@ curl --location 'http://localhost:5000/stop/nav2' \
 
 This section provides guidance for developers working on the new OM brainpack system.
 
-![brainpack](./models/backpack.jpg)
+![brainpack](./models/backpack.png)
 
 You can connect your Linux machine to one of the Ethernet ports of the OM brainpack.
 

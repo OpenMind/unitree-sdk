@@ -44,11 +44,7 @@ jobs:
 
         # Install rosdep if not already installed
         apt-get install -y python3-rosdep \
-        ros-humble-rosidl-default-generators \
-        ros-humble-rosidl-default-runtime \
-        ros-humble-rosidl-generator-c \
-        ros-humble-rosidl-typesupport-c \
-        ros-humble-rosidl-typesupport-cpp
+        ros-humble-rosidl-generator-dds-idl
 
         # Initialize rosdep if needed
         if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then

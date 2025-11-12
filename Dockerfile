@@ -22,6 +22,7 @@ RUN apt-get install -y \
     ros-humble-builtin-interfaces \
     ros-humble-std-msgs \
     ros-humble-geometry-msgs \
+    ros-humble-rosidl-generator-dds-idl \
     ros-humble-rosidl-default-generators \
     ros-humble-rosidl-default-runtime \
     ros-humble-rosidl-generator-c \

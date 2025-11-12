@@ -14,13 +14,18 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch/base_control_launch.py',
             'launch/slam_launch.py',
-            'launch/nav2_launch.py'
+            'launch/nav2_launch.py',
+            'launch/rtabmap_localization.py',
+            'launch/rtabmap_launch.py'
         ]),
         ('share/' + package_name + '/urdf', [
             'urdf/g1_23dof.urdf',
         ]),
         ('share/' + package_name + '/config', [
             'config/slam.yaml',
+            'config/nav2_parameters.yaml',
+            'config/navigate_to_pose.xml',
+            
         ]),
         ('share/' + package_name + '/meshes', [
             os.path.join('meshes', f) for f in os.listdir('meshes') if f.endswith('.STL')

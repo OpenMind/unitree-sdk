@@ -1,0 +1,303 @@
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    action_server_result_timeout: 900.0
+    navigators: ["navigate_to_pose"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    error_code_names:
+      - compute_path_error_code
+      - follow_path_error_code
+    # NOTE: plugin_lib_names is NOT needed here - Nav2 auto-discovers BT plugins
+    # Including it causes "ID already registered" errors due to double registration
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 40.0
+    # G1 actual minimum velocities - robot cannot move below these thresholds
+    min_x_velocity_threshold: 0.25  # G1 minimum linear velocity to initiate movement
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.35  # G1 minimum angular velocity to initiate rotation
+    failure_tolerance: 0.5
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    use_realtime_priority: false
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.3
+      movement_time_allowance: 20.0
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.20  # Slightly increased to account for minimum velocity constraints
+      yaw_goal_tolerance: 0.20  # Slightly increased for better final orientation settling
+    FollowPath:
+      plugin: "nav2_mppi_controller::MPPIController"
+      time_steps: 56
+      model_dt: 0.05
+      batch_size: 2000
+      vx_std: 0.25  # Reduced for more predictable behavior near goal
+      vy_std: 0.0
+      wz_std: 0.5  # Increased for more angular velocity variation
+      vx_max: 0.5  # Maximum forward velocity
+      vx_min: 0.25  # CRITICAL: Match G1's minimum linear velocity
+      vy_max: 0.0
+      wz_max: 1.2  # INCREASED: Faster turning (was 0.8)
+      iteration_count: 1
+      prune_distance: 1.7
+      transform_tolerance: 0.3
+      temperature: 0.3
+      gamma: 0.015
+      motion_model: "DiffDrive"
+      visualize: False
+      regenerate_noises: False
+      critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
+      ConstraintCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 4.0
+      GoalCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 15.0  # Increased to pull robot toward goal more strongly
+        threshold_to_consider: 1.0  # Start considering goal earlier to begin deceleration
+      GoalAngleCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 30.0  # Very high weight for precise final orientation
+        threshold_to_consider: 0.5  # Start angle correction earlier
+      PreferForwardCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 8.0  # Increased to strongly discourage backward motion
+        threshold_to_consider: 0.5
+      CostCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 3.81
+        critical_cost: 300.0
+        consider_footprint: True
+        collision_cost: 1000000.0
+        near_goal_distance: 1.2  # CRITICAL: Increased to trigger slowdown earlier
+        trajectory_point_step: 2
+      PathAlignCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 14.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 20
+        use_path_orientations: False
+      PathFollowCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 5.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+      PathAngleCritic:
+        enabled: True
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        mode: 0
+      noise_generator_config:
+        default:
+          time_steps: 56
+          batch_size: 2000
+          vx_std: 0.25  # Updated to match controller - reduced for better control
+          wz_std: 0.5  # Updated to match controller - increased for faster turning
+          vx_mu: 0.0  # No bias - allow natural stopping
+          wz_mu: 0.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: True
+      width: 4  # Increased for G1's larger size
+      height: 4  # Increased for G1's larger size
+      resolution: 0.05
+      # G1 humanoid approximate footprint (larger than original)
+      footprint: "[[0.35, 0.25], [0.35, -0.25], [-0.35, -0.25], [-0.35, 0.25]]"
+      plugins: ["static_layer", "obstacle_layer", "stvl_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      stvl_layer:
+        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
+        enabled: True
+        voxel_decay: 0.5  # Faster decay for dynamic obstacles
+        decay_model: 0
+        voxel_size: 0.05  # Slightly larger voxels for better ground coverage
+        track_unknown_space: True
+        observation_persistence: 0.0
+        max_obstacle_height: 2.5
+        min_obstacle_height: -0.05  # CRITICAL: Negative to catch ground obstacles
+        obstacle_max_range: 2.5
+        obstacle_min_range: 0.4  # CRITICAL: Increased to filter out G1's head
+        origin_z: 0.0
+        publish_voxel_map: True
+        transform_tolerance: 0.5
+        mapping_mode: False
+        map_save_duration: 60.0
+        combination_method: 1  # Max - more conservative obstacle marking
+        update_footprint_enabled: True
+        observation_sources: lidar_4d
+        lidar_4d:
+          data_type: PointCloud2
+          topic: /utlidar/cloud_livox_mid360
+          marking: True
+          clearing: True
+          min_obstacle_height: -0.05  # CRITICAL: Negative to include ground points
+          max_obstacle_height: 2.5
+          expected_update_rate: 15.0
+          observation_persistence: 0.0
+          inf_is_valid: False
+          filter: "voxel"
+          voxel_min_points: 1  # Lowered to be more sensitive
+          clear_after_reading: True
+          enabled: True
+          model_type: 1  # 3D projection model
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 1.5
+        # CRITICAL FIX: Inflation radius must be >= circumscribed radius
+        # Circumscribed radius for footprint [[0.35, 0.25], ...] ≈ 0.43
+        inflation_radius: 0.45  # Increased from 0.28 to fix error
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: map
+      robot_base_frame: base_link
+      # G1 humanoid approximate footprint
+      footprint: "[[0.35, 0.25], [0.35, -0.25], [-0.35, -0.25], [-0.35, 0.25]]"
+      resolution: 0.1
+      track_unknown_space: True
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 3.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        # CRITICAL FIX: Inflation radius must be >= circumscribed radius
+        inflation_radius: 0.45  # Increased from 0.3
+      always_send_full_costmap: True
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 5.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner::SmacPlanner2D"
+      tolerance: 0.3
+      downsample_costmap: False
+      downsampling_factor: 1
+      allow_unknown: True
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      smooth_path: True
+
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: True
+
+behavior_server:
+  ros__parameters:
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+      backup_dist: 0.0  # Disabled backup behavior
+      backup_speed: 0.0  # No backward speed
+      time_allowance: 10.0
+    drive_on_heading:
+      plugin: "nav2_behaviors::DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors::AssistedTeleop"
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_tolerance: 0.5
+    simulate_ahead_time: 2.5
+    max_rotational_vel: 1.2  # Increased to match MPPI wz_max for faster turning
+    min_rotational_vel: 0.35  # Match G1's minimum angular velocity
+    rotational_acc_lim: 3.2
+
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 20
+    stop_on_failure: False
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200
+
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.5, 0.0, 1.2]  # Match MPPI limits - increased wz_max for faster turning
+    min_velocity: [-0.0, 0.0, -1.2]  # No backward motion for x, match wz_max
+    max_accel: [1.2, 0.0, 2.5]  # Increased angular acceleration for faster turning response
+    max_decel: [-2.5, 0.0, -3.0]  # Increased deceleration to stop faster from higher speeds
+    odom_topic: "odom"
+    odom_duration: 0.1
+    deadband_velocity: [0.25, 0.0, 0.35]  # CRITICAL: Match G1's minimum velocities
+    velocity_timeout: 1.0

@@ -12,7 +12,7 @@ jobs:
   ros2-build:
     runs-on: ubuntu-latest
     container:
-      image: ros:humble-desktop
+      image: ros:humble-ros-base-jammy
 
     steps:
     - name: Checkout code

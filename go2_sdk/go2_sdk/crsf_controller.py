@@ -1,9 +1,10 @@
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Joy
-import serial
 import threading
 from enum import IntEnum
+
+import rclpy
+import serial
+from rclpy.node import Node
+from sensor_msgs.msg import Joy
 
 
 class PacketsTypes(IntEnum):
@@ -44,19 +45,19 @@ def n(val):
 
 class CrsfJoyBridge(Node):
     def __init__(self):
-        super().__init__('crsf_joy_bridge')
+        super().__init__("crsf_joy_bridge")
 
-        self.declare_parameter('serial_port', '/dev/ttyUSB1')
-        self.declare_parameter('baud_rate', 420000)
-        self.declare_parameter('publish_rate', 50.0)
-        self.declare_parameter('deadband', 0.3)
+        self.declare_parameter("serial_port", "/dev/ttyUSB1")
+        self.declare_parameter("baud_rate", 420000)
+        self.declare_parameter("publish_rate", 50.0)
+        self.declare_parameter("deadband", 0.3)
 
-        self.port = self.get_parameter('serial_port').value
-        self.baud = self.get_parameter('baud_rate').value
-        self.deadband = self.get_parameter('deadband').value
-        self.publish_rate = self.get_parameter('publish_rate').value
+        self.port = self.get_parameter("serial_port").value
+        self.baud = self.get_parameter("baud_rate").value
+        self.deadband = self.get_parameter("deadband").value
+        self.publish_rate = self.get_parameter("publish_rate").value
 
-        self.joy_pub = self.create_publisher(Joy, 'joy', 10)
+        self.joy_pub = self.create_publisher(Joy, "joy", 10)
 
         self.serial_thread = None
         self.running = False
@@ -70,16 +71,20 @@ class CrsfJoyBridge(Node):
 
         self.start_serial()
 
-        self.get_logger().info(f'CRSF Joy Bridge started on {self.port} at {self.baud} baud')
+        self.get_logger().info(
+            f"CRSF Joy Bridge started on {self.port} at {self.baud} baud"
+        )
 
     def start_serial(self):
         try:
             self.ser = serial.Serial(self.port, self.baud, timeout=1)
             self.running = True
-            self.serial_thread = threading.Thread(target=self.serial_reader, daemon=True)
+            self.serial_thread = threading.Thread(
+                target=self.serial_reader, daemon=True
+            )
             self.serial_thread.start()
         except Exception as e:
-            self.get_logger().error(f'Failed to open serial port: {e}')
+            self.get_logger().error(f"Failed to open serial port: {e}")
 
     def serial_reader(self):
         input_buffer = bytearray()
@@ -104,7 +109,7 @@ class CrsfJoyBridge(Node):
                         break
 
             except Exception as e:
-                self.get_logger().error(f'Serial read error: {e}')
+                self.get_logger().error(f"Serial read error: {e}")
                 break
 
     def handle_crsf_packet(self, ptype, data):
@@ -125,9 +130,9 @@ class CrsfJoyBridge(Node):
             lud = (n(rc_packet[2]) - 0.5) * 2.0  # Left stick up/down
             llr = (n(rc_packet[3]) - 0.5) * 2.0  # Left stick left/right
             rud = (n(rc_packet[0]) - 0.5) * 2.0  # Right stick up/down
-            rlr = (n(rc_packet[1]) - 0.5) * - 2.0  # Right stick left/right
+            rlr = (n(rc_packet[1]) - 0.5) * -2.0  # Right stick left/right
 
-            if abs(lud) < self.get_parameter('deadband').value:
+            if abs(lud) < self.get_parameter("deadband").value:
                 lud = 0.0
 
             # Map switches to buttons (0 or 1)
@@ -152,7 +157,7 @@ class CrsfJoyBridge(Node):
         self.running = False
         if self.serial_thread:
             self.serial_thread.join(timeout=1.0)
-        if hasattr(self, 'ser'):
+        if hasattr(self, "ser"):
             self.ser.close()
         super().destroy_node()
 
@@ -170,5 +175,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

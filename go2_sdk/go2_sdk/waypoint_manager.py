@@ -1,26 +1,29 @@
 import rclpy
-from rclpy.node import Node
 import tf2_ros
-from tf2_ros import TransformException
 from geometry_msgs.msg import PoseStamped
+from rclpy.node import Node
+from tf2_ros import TransformException
+
 
 class WaypointManager(Node):
     def __init__(self):
-        super().__init__('waypoint_manager')
+        super().__init__("waypoint_manager")
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        self.pose_publisher = self.create_publisher(PoseStamped, '/om/pose', 10)
+        self.pose_publisher = self.create_publisher(PoseStamped, "/om/pose", 10)
 
         self.log_frequency = 1.0
-        self.map_frame = 'map'
-        self.base_frame = 'base_link'
+        self.map_frame = "map"
+        self.base_frame = "base_link"
 
         self.timer = self.create_timer(1.0 / self.log_frequency, self.publish_pose)
 
-        self.get_logger().info(f'Robot location logger started. Logging at {self.log_frequency} Hz')
-        self.get_logger().info(f'Transform: {self.map_frame} -> {self.base_frame}')
+        self.get_logger().info(
+            f"Robot location logger started. Logging at {self.log_frequency} Hz"
+        )
+        self.get_logger().info(f"Transform: {self.map_frame} -> {self.base_frame}")
 
     def publish_pose(self):
         """
@@ -31,7 +34,7 @@ class WaypointManager(Node):
                 self.map_frame,
                 self.base_frame,
                 rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=1.0)
+                timeout=rclpy.duration.Duration(seconds=1.0),
             )
 
             x = transform.transform.translation.x
@@ -59,14 +62,15 @@ class WaypointManager(Node):
             self.pose_publisher.publish(pose_msg)
 
             self.get_logger().debug(
-                f'Robot Location: X={x:.3f}, Y={y:.3f}, Z={z:.3f} | '
-                f'Orientation (Quaternion): [{qx:.3f}, {qy:.3f}, {qz:.3f}, {qw:.3f}]'
+                f"Robot Location: X={x:.3f}, Y={y:.3f}, Z={z:.3f} | "
+                f"Orientation (Quaternion): [{qx:.3f}, {qy:.3f}, {qz:.3f}, {qw:.3f}]"
             )
 
         except TransformException as ex:
-            self.get_logger().warn(f'Could not get transform: {ex}')
+            self.get_logger().warn(f"Could not get transform: {ex}")
         except Exception as ex:
-            self.get_logger().error(f'Error logging robot location: {ex}')
+            self.get_logger().error(f"Error logging robot location: {ex}")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -80,5 +84,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

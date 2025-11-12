@@ -1,13 +1,15 @@
 import os
-import requests
 from typing import Dict
 
-env = os.getenv('ENV', 'production')
+import requests
 
-if env == 'development':
+env = os.getenv("ENV", "production")
+
+if env == "development":
     map_api_url = "https://api-dev.openmind.org/api/core/maps/upload"
 else:
     map_api_url = "https://api.openmind.org/api/core/maps/upload"
+
 
 class MapUploadManager:
     """
@@ -24,14 +26,16 @@ class MapUploadManager:
             Logger instance for logging messages.
         """
         self.logger = logger
-        self.api_key = os.getenv('OM_API_KEY')
+        self.api_key = os.getenv("OM_API_KEY")
 
         if not self.api_key:
             self.logger.error("OM_API_KEY environment variable not set!")
 
         self.map_api_url = map_api_url
 
-    def upload_map(self, map_name: str, files_created: list, base_path: str) -> Dict[str, str]:
+    def upload_map(
+        self, map_name: str, files_created: list, base_path: str
+    ) -> Dict[str, str]:
         """
         Upload map files to cloud storage.
 
@@ -97,7 +101,9 @@ class MapUploadManager:
 
         return has_yaml and has_pgm
 
-    def _upload_files(self, map_name: str, yaml_path: str, pgm_path: str) -> Dict[str, str]:
+    def _upload_files(
+        self, map_name: str, yaml_path: str, pgm_path: str
+    ) -> Dict[str, str]:
         """
         Upload the map files to the cloud API.
 
@@ -116,17 +122,17 @@ class MapUploadManager:
             Result dictionary with success/error status and message.
         """
         try:
-            with open(yaml_path, 'rb') as yaml_file, open(pgm_path, 'rb') as pgm_file:
+            with open(yaml_path, "rb") as yaml_file, open(pgm_path, "rb") as pgm_file:
                 files = {
-                    'map_yaml': (f"{map_name}.yaml", yaml_file, 'application/x-yaml'),
-                    'map_pgm': (f"{map_name}.pgm", pgm_file, 'image/x-portable-graymap')
+                    "map_yaml": (f"{map_name}.yaml", yaml_file, "application/x-yaml"),
+                    "map_pgm": (
+                        f"{map_name}.pgm",
+                        pgm_file,
+                        "image/x-portable-graymap",
+                    ),
                 }
-                headers = {
-                    'Authorization': f'Bearer {self.api_key}'
-                }
-                data = {
-                    'map_name': map_name
-                }
+                headers = {"Authorization": f"Bearer {self.api_key}"}
+                data = {"map_name": map_name}
 
                 self.logger.info(f"Sending upload request to {self.map_api_url}")
 
@@ -135,7 +141,7 @@ class MapUploadManager:
                     files=files,
                     headers=headers,
                     data=data,
-                    timeout=60  # 60 second timeout for file uploads
+                    timeout=60,  # 60 second timeout for file uploads
                 )
 
                 response.raise_for_status()
@@ -147,7 +153,7 @@ class MapUploadManager:
                     "status": "success",
                     "message": success_msg,
                     "response_code": response.status_code,
-                    "response_text": response.text
+                    "response_text": response.text,
                 }
 
         except requests.exceptions.Timeout:

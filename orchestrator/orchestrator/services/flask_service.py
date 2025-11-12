@@ -1,7 +1,8 @@
 import threading
+from typing import Optional
+
 from flask import Flask
 from flask_cors import CORS
-from typing import Optional
 
 
 class FlaskService:
@@ -9,7 +10,7 @@ class FlaskService:
     Manages the Flask application and HTTP server.
     """
 
-    def __init__(self, host: str = '0.0.0.0', port: int = 5000, logger=None):
+    def __init__(self, host: str = "0.0.0.0", port: int = 5000, logger=None):
         """
         Initialize the Flask service.
 
@@ -58,7 +59,9 @@ class FlaskService:
         Run the Flask application.
         """
         try:
-            self.app.run(host=self.host, port=self.port, use_reloader=False, debug=False)
+            self.app.run(
+                host=self.host, port=self.port, use_reloader=False, debug=False
+            )
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Flask server error: {e}")

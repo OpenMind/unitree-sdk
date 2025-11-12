@@ -65,7 +65,7 @@ COPY . /app/unitree_go2_ros2_sdk
 WORKDIR /app/unitree_go2_ros2_sdk
 
 RUN rosdep install -y --ignore-src --from-paths . -r
-RUN pip install -r requirements.txt --force-reinstall --no-deps
+RUN pip install -e . --force-reinstall --no-deps
 RUN source /opt/ros/humble/setup.bash && colcon build
 
 RUN echo '#!/bin/bash' > /entrypoint.sh && \

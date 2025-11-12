@@ -1,11 +1,12 @@
 import logging
 import threading
 import time
-from queue import Queue, Empty
-from typing import Optional, Callable
+from queue import Empty, Queue
+from typing import Callable, Optional
 
 import websockets
 from websockets.sync.client import connect
+
 
 class WebSocketClient:
     """

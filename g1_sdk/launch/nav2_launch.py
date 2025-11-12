@@ -8,39 +8,11 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_dir = get_package_share_directory('g1_sdk')
 
-    urdf_file = os.path.join(pkg_dir, 'urdf', 'g1_23dof.urdf')
-    with open(urdf_file, 'r') as infp:
-        robot_desc = infp.read()
-
-    nav2_config_file = os.path.join(pkg_dir, 'config', 'nav2_params.yaml')
-    map_yaml_file = LaunchConfiguration('map_yaml_file', default=EnvironmentVariable('MAP_YAML_FILE', default_value=''))
+    nav2_config_file = os.path.join(pkg_dir, 'config', 'nav2_parameters.yaml')
+    # map_yaml_file removed, not needed since map/localization is handled by rtabmap
 
     return LaunchDescription([
-        DeclareLaunchArgument(
-            'map_yaml_file',
-            description='Full path to map yaml file (leave empty for SLAM mode)'),
-
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='robot_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': robot_desc}]
-        ),
-
-        Node(
-            package='g1_sdk',
-            executable='g1_jointstate',
-            name='g1_jointstate',
-            output='screen',
-        ),
-
-        Node(
-            package='g1_sdk',
-            executable='g1_odom',
-            name='g1_odom',
-            output='screen',
-        ),
+        # map_yaml_file argument removed
 
         Node(
             package='pointcloud_to_laserscan',
@@ -140,33 +112,5 @@ def generate_launch_description():
                        ('/cmd_vel_smoothed', '/cmd_vel')]
         ),
 
-        Node(
-            package='nav2_map_server',
-            executable='map_server',
-            name='map_server',
-            output='screen',
-            parameters=[{
-                'use_sim_time': False,
-                'yaml_filename': map_yaml_file
-            }]
-        ),
-
-        Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager_localization',
-            output='screen',
-            parameters=[
-                {'use_sim_time': False},
-                {'autostart': True},
-                {'node_names': ['map_server', 'amcl']}]
-        ),
-
-        Node(
-            package='nav2_amcl',
-            executable='amcl',
-            name='amcl',
-            output='screen',
-            parameters=[nav2_config_file]
-        )
+        # map_server and amcl nodes removed as requested
     ])

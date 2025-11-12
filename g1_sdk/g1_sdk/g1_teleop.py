@@ -46,7 +46,7 @@ class CmdVelToG1LocoNode(Node):
         # Velocity limits for G1 (conservative defaults, adjust based on robot capabilities)
         self.max_linear_x_velocity = 0.5  # m/s forward/backward
         self.max_linear_y_velocity = 0.3  # m/s lateral
-        self.max_angular_velocity = 0.6   # rad/s rotation
+        self.max_angular_velocity = 10.0   # rad/s rotation
         
         # Movement parameters
         self.movement_timeout = 1.0  # seconds

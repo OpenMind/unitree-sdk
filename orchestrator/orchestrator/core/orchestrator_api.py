@@ -162,12 +162,14 @@ class OrchestratorAPI(Node):
         return ProcessStatus(
             slam_status="running" if self.is_slam_running() else "stopped",
             nav2_status="running" if self.is_nav2_running() else "stopped",
-            base_control_status="running"
-            if self.is_base_control_running()
-            else "stopped",
-            charging_dock_status="running"
-            if self.charging_manager.is_dock_process_running()
-            else "stopped",
+            base_control_status=(
+                "running" if self.is_base_control_running() else "stopped"
+            ),
+            charging_dock_status=(
+                "running"
+                if self.charging_manager.is_dock_process_running()
+                else "stopped"
+            ),
             is_charging=self.charging_manager.is_charging,
             battery_soc=self.charging_manager.battery_soc,
             battery_current=self.charging_manager.battery_current,

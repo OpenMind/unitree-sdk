@@ -19,6 +19,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup ROS2 workspace
+      shell: bash
       run: |
         # Source ROS2 setup
         source /opt/ros/humble/setup.bash

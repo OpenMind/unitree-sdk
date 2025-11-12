@@ -3,11 +3,9 @@ import math
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
-from rclpy.node import Node
-
-from sensor_msgs.msg import CameraInfo, Image
-from sensor_msgs.msg import PointCloud
 from geometry_msgs.msg import Point32
+from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, Image, PointCloud
 
 
 class D435ObstacleDector(Node):
@@ -37,9 +35,7 @@ class D435ObstacleDector(Node):
         )
 
         self.obstacle_pub = self.create_publisher(
-            PointCloud,
-            "/camera/realsense2_camera_node/depth/obstacle_point",
-            10
+            PointCloud, "/camera/realsense2_camera_node/depth/obstacle_point", 10
         )
 
         self.get_logger().info("Intel435ObstacleDector node started")
@@ -62,7 +58,9 @@ class D435ObstacleDector(Node):
             self.get_logger().debug("Camera intrinsics not available yet")
             return []
 
-        rows, cols = np.mgrid[0:depth_image.shape[0]:10, 0:depth_image.shape[1]:10]
+        rows, cols = np.mgrid[
+            0 : depth_image.shape[0] : 10, 0 : depth_image.shape[1] : 10
+        ]
 
         depth_values = depth_image[rows, cols]
 
@@ -82,17 +80,21 @@ class D435ObstacleDector(Node):
         points_camera = np.vstack([cam_x, cam_y, cam_z])
 
         theta = np.radians(tilt_angle)
-        R_tilt = np.array([
-            [1, 0, 0],
-            [0, np.cos(theta), np.sin(theta)],
-            [0, -np.sin(theta), np.cos(theta)],
-        ])
+        R_tilt = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(theta), np.sin(theta)],
+                [0, -np.sin(theta), np.cos(theta)],
+            ]
+        )
 
-        R_align = np.array([
-            [0, 0, 1],   # Camera Z (forward) -> World X (forward)
-            [-1, 0, 0],  # Camera X (right) -> World Y (left)
-            [0, -1, 0],  # Camera Y (down) -> World Z (up)
-        ])
+        R_align = np.array(
+            [
+                [0, 0, 1],  # Camera Z (forward) -> World X (forward)
+                [-1, 0, 0],  # Camera X (right) -> World Y (left)
+                [0, -1, 0],  # Camera Y (down) -> World Z (up)
+            ]
+        )
 
         R_combined = R_align @ R_tilt
 
@@ -116,11 +118,13 @@ class D435ObstacleDector(Node):
         world_z_filtered = world_z[obstacle_mask]
 
         for i in range(len(world_x_filtered)):
-            obstacles.append(Point32(
-                x=float(-world_y_filtered[i]),
-                y=float(world_x_filtered[i]),
-                z=float(world_z_filtered[i])
-            ))
+            obstacles.append(
+                Point32(
+                    x=float(-world_y_filtered[i]),
+                    y=float(world_x_filtered[i]),
+                    z=float(world_z_filtered[i]),
+                )
+            )
 
         return obstacles
 
@@ -142,6 +146,7 @@ class D435ObstacleDector(Node):
 
         except Exception as e:
             self.get_logger().error(f"Error processing depth image: {e}")
+
 
 def main(args=None):
     rclpy.init(args=args)

@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict
+
 from ..models.data_models import LocationModel
 
 
@@ -45,8 +46,10 @@ class LocationManager:
         Dict[str, str]
             Dictionary containing status and message.
         """
-        map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
-        locations_file = os.path.join(self.locations_directory, 'locations.json')
+        map_locations_file = os.path.join(
+            self.maps_directory, map_name, "locations.json"
+        )
+        locations_file = os.path.join(self.locations_directory, "locations.json")
 
         os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
         os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
@@ -54,22 +57,28 @@ class LocationManager:
         existing_locations = {}
         if os.path.exists(map_locations_file):
             try:
-                with open(map_locations_file, 'r') as f:
+                with open(map_locations_file, "r") as f:
                     existing_locations = json.load(f)
             except Exception as e:
-                return {"status": "error", "message": f"Failed to read existing locations: {str(e)}"}
+                return {
+                    "status": "error",
+                    "message": f"Failed to read existing locations: {str(e)}",
+                }
 
         location_dict = location.model_dump()
         existing_locations[location.name] = location_dict
 
         try:
-            with open(map_locations_file, 'w') as f:
+            with open(map_locations_file, "w") as f:
                 json.dump(existing_locations, f, indent=4)
 
-            with open(locations_file, 'w') as f:
+            with open(locations_file, "w") as f:
                 json.dump(existing_locations, f, indent=4)
 
-            return {"status": "success", "message": f"Location '{location.name}' added/updated"}
+            return {
+                "status": "success",
+                "message": f"Location '{location.name}' added/updated",
+            }
         except Exception as e:
             return {"status": "error", "message": f"Failed to save location: {str(e)}"}
 
@@ -82,13 +91,13 @@ class LocationManager:
         Dict[str, LocationModel]
             Dictionary of location name to LocationModel.
         """
-        locations_file = os.path.join(self.locations_directory, 'locations.json')
+        locations_file = os.path.join(self.locations_directory, "locations.json")
 
         if not os.path.exists(locations_file):
             return {}
 
         try:
-            with open(locations_file, 'r') as f:
+            with open(locations_file, "r") as f:
                 locations_data = json.load(f)
 
             locations = {}
@@ -97,7 +106,9 @@ class LocationManager:
                     locations[name] = LocationModel(**data)
                 except Exception as e:
                     if self.logger:
-                        self.logger.warning(f"Failed to parse location '{name}': {str(e)}")
+                        self.logger.warning(
+                            f"Failed to parse location '{name}': {str(e)}"
+                        )
 
             return locations
         except Exception as e:
@@ -112,18 +123,20 @@ class LocationManager:
         """
         try:
             # Clear global locations file
-            locations_file = os.path.join(self.locations_directory, 'locations.json')
+            locations_file = os.path.join(self.locations_directory, "locations.json")
             if os.path.exists(locations_file):
-                with open(locations_file, 'w') as f:
+                with open(locations_file, "w") as f:
                     json.dump({}, f)
 
             # Clear all per-map location files
             cleared_count = 0
             if os.path.exists(self.maps_directory):
                 for map_dir in os.listdir(self.maps_directory):
-                    map_locations_file = os.path.join(self.maps_directory, map_dir, 'locations.json')
+                    map_locations_file = os.path.join(
+                        self.maps_directory, map_dir, "locations.json"
+                    )
                     if os.path.exists(map_locations_file):
-                        with open(map_locations_file, 'w') as f:
+                        with open(map_locations_file, "w") as f:
                             json.dump({}, f)
                         cleared_count += 1
 
@@ -152,8 +165,10 @@ class LocationManager:
         Dict[str, LocationModel]
             Dictionary of location name to LocationModel.
         """
-        map_locations_file = os.path.join(self.maps_directory, map_name, 'locations.json')
-        locations_file = os.path.join(self.locations_directory, 'locations.json')
+        map_locations_file = os.path.join(
+            self.maps_directory, map_name, "locations.json"
+        )
+        locations_file = os.path.join(self.locations_directory, "locations.json")
 
         os.makedirs(os.path.dirname(map_locations_file), mode=0o755, exist_ok=True)
         os.makedirs(os.path.dirname(locations_file), mode=0o755, exist_ok=True)
@@ -161,18 +176,20 @@ class LocationManager:
         existing_locations = {}
         if os.path.exists(map_locations_file):
             try:
-                with open(map_locations_file, 'r') as f:
+                with open(map_locations_file, "r") as f:
                     existing_locations = json.load(f)
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"The locations file for map {map_name} is corrupted: {str(e)}")
+                    self.logger.error(
+                        f"The locations file for map {map_name} is corrupted: {str(e)}"
+                    )
 
         # Ensure both files are in sync
         try:
-            with open(map_locations_file, 'w') as f:
+            with open(map_locations_file, "w") as f:
                 json.dump(existing_locations, f, indent=4)
 
-            with open(locations_file, 'w') as f:
+            with open(locations_file, "w") as f:
                 json.dump(existing_locations, f, indent=4)
         except Exception as e:
             if self.logger:

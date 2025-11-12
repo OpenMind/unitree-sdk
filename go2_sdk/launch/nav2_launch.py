@@ -1,15 +1,17 @@
 import os
+
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, EnvironmentVariable
+from launch.substitutions import EnvironmentVariable, LaunchConfiguration
 from launch_ros.actions import Node
 
-def generate_launch_description():
-    pkg_dir = get_package_share_directory('go2_sdk')
 
-    urdf_file = os.path.join(pkg_dir, 'urdf', 'go2.urdf')
-    with open(urdf_file, 'r') as infp:
+def generate_launch_description():
+    pkg_dir = get_package_share_directory("go2_sdk")
+
+    urdf_file = os.path.join(pkg_dir, "urdf", "go2.urdf")
+    with open(urdf_file, "r") as infp:
         robot_desc = infp.read()
 
     nav2_config_file = os.path.join(pkg_dir, 'config', 'nav2_params.yaml')

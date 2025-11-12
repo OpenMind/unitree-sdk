@@ -1,29 +1,31 @@
 import os
 from glob import glob
+
 from setuptools import find_packages, setup
 
-package_name = 'go2_sdk'
+package_name = "go2_sdk"
 
 setup(
     name=package_name,
-    version='0.1.0',
-    packages=find_packages(exclude=['test']),
+    version="0.1.0",
+    packages=find_packages(exclude=["test"]),
     data_files=[
-        ('share/ament_index/resource_index/packages',
-            ['resource/go2_sdk']),
-        ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', glob('launch/*')),
-        ('share/' + package_name + '/config', ['config/slam.yaml', 'config/rviz.rviz', 'config/nav2_params.yaml']),
-        ('share/' + package_name + '/urdf', ['urdf/go2.urdf']),
-        (os.path.join('share', package_name, 'dae'), glob(os.path.join('dae', '*'))),
-
+        ("share/ament_index/resource_index/packages", ["resource/go2_sdk"]),
+        ("share/" + package_name, ["package.xml"]),
+        ("share/" + package_name + "/launch", glob("launch/*")),
+        (
+            "share/" + package_name + "/config",
+            ["config/slam.yaml", "config/rviz.rviz", "config/nav2_params.yaml"],
+        ),
+        ("share/" + package_name + "/urdf", ["urdf/go2.urdf"]),
+        (os.path.join("share", package_name, "dae"), glob(os.path.join("dae", "*"))),
     ],
-    install_requires=['setuptools'],
+    install_requires=["setuptools"],
     zip_safe=True,
-    maintainer='openmind',
-    maintainer_email='hello@openmind.org',
-    description='Unitree Go2 robot SLAM package with RPLidar',
-    license='MIT',
+    maintainer="openmind",
+    maintainer_email="hello@openmind.org",
+    description="Unitree Go2 robot SLAM package with RPLidar",
+    license="MIT",
     entry_points={
         'console_scripts': [
             'pose_to_tf = go2_sdk.pose_to_tf:main',

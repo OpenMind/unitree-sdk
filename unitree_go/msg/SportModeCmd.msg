@@ -9,5 +9,3 @@ float32[2] velocity
 float32 yaw_speed
 BmsCmd bms_cmd
 PathPoint[30] path_point
-
-

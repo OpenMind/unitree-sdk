@@ -1,14 +1,14 @@
 import json
 import os
-from typing import Optional, Callable
+from typing import Callable, Optional
 from uuid import uuid4
 
 from ..utils.ws_client import WebSocketClient
 from ..utils.ws_server import WebSocketServer
 
-env = os.getenv('ENV', 'production')
+env = os.getenv("ENV", "production")
 
-if env == 'development':
+if env == "development":
     pose_ws_url = "wss://api-dev.openmind.org/api/core/teleops/pose"
     map_ws_url = "wss://api-dev.openmind.org/api/core/teleops/maps"
     api_ws_url = "wss://api-dev.openmind.org/api/core/teleops/api"
@@ -33,14 +33,20 @@ class CloudConnectionManager:
             Logger instance for logging messages.
         """
         self.logger = logger
-        self.api_key = os.getenv('OM_API_KEY')
+        self.api_key = os.getenv("OM_API_KEY")
 
         if not self.api_key:
             self.logger.error("OM_API_KEY environment variable not set!")
 
-        self.pose_ws_url = f"{pose_ws_url}?api_key={self.api_key}" if self.api_key else None
-        self.map_ws_url = f"{map_ws_url}?api_key={self.api_key}" if self.api_key else None
-        self.api_ws_url = f"{api_ws_url}?api_key={self.api_key}" if self.api_key else None
+        self.pose_ws_url = (
+            f"{pose_ws_url}?api_key={self.api_key}" if self.api_key else None
+        )
+        self.map_ws_url = (
+            f"{map_ws_url}?api_key={self.api_key}" if self.api_key else None
+        )
+        self.api_ws_url = (
+            f"{api_ws_url}?api_key={self.api_key}" if self.api_key else None
+        )
 
         self.pose_ws: Optional[WebSocketClient] = None
         self.map_ws: Optional[WebSocketClient] = None
@@ -64,9 +70,11 @@ class CloudConnectionManager:
                 self.map_ws.start()
                 self.logger.info("Map WebSocket connection initialized")
 
-            self.local_api_ws = WebSocketServer(self.logger, host='0.0.0.0', port=6123)
+            self.local_api_ws = WebSocketServer(self.logger, host="0.0.0.0", port=6123)
             self.local_api_ws.start()
-            self.logger.info(f"Local API WebSocket server started on {self.local_api_ws.host}:{self.local_api_ws.port}")
+            self.logger.info(
+                f"Local API WebSocket server started on {self.local_api_ws.host}:{self.local_api_ws.port}"
+            )
 
             if self.api_ws_url:
                 self.cloud_api_ws = WebSocketClient(self.api_ws_url, self.logger)

@@ -1,6 +1,7 @@
 """
 Process lifecycle management for ROS2 launch files.
 """
+
 import os
 import signal
 import subprocess
@@ -37,14 +38,9 @@ class ProcessManager:
             already running.
         """
         if self.process is None or self.process.poll() is not None:
-            cmd = [
-                'ros2',
-                'launch',
-                'go2_sdk',
-                launch_file
-            ]
+            cmd = ["ros2", "launch", "go2_sdk", launch_file]
             if map_yaml:
-                cmd.extend(['map_yaml_file:=' + map_yaml])
+                cmd.extend(["map_yaml_file:=" + map_yaml])
             self.process = subprocess.Popen(cmd, preexec_fn=os.setsid)
             return True
         return False

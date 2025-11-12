@@ -1,27 +1,30 @@
-import rclpy
 import os
 import queue
-import threading
-from rclpy.node import Node
 import subprocess
-import cv2
-import numpy as np
+import threading
 import time
 from collections import deque
+
+import cv2
+import numpy as np
+import rclpy
+from rclpy.node import Node
 from sensor_msgs.msg import Image
+
 
 class D435RGBStream(Node):
     """
     A ROS2 node that reads RGB images from the D435 camera and streams video using FFmpeg.
     """
+
     def __init__(self):
         super().__init__("d435_rgb_stream_node")
 
-        self.api_key = os.getenv('OM_API_KEY')
+        self.api_key = os.getenv("OM_API_KEY")
         if not self.api_key:
             self.get_logger().error("OM_API_KEY environment variable not set!")
 
-        self.api_key_id = os.getenv('OM_API_KEY_ID')
+        self.api_key_id = os.getenv("OM_API_KEY_ID")
         if not self.api_key_id:
             self.get_logger().error("OM_API_KEY_ID environment variable not set!")
 
@@ -53,7 +56,7 @@ class D435RGBStream(Node):
             Image,
             "/camera/realsense2_camera_node/color/image_raw",
             self.camera_response_callback,
-            10
+            10,
         )
 
         self.get_logger().info("D435 RGB stream node initialized")
@@ -89,7 +92,9 @@ class D435RGBStream(Node):
         Setup FFmpeg process for video streaming
         """
         if not self.api_key or not self.api_key_id:
-            self.get_logger().error("API key or API key ID not set, cannot start FFmpeg stream")
+            self.get_logger().error(
+                "API key or API key ID not set, cannot start FFmpeg stream"
+            )
             return
 
         if self.ffmpeg_process:
@@ -110,25 +115,37 @@ class D435RGBStream(Node):
             "ffmpeg",
             "-y",
             # --- Video input (raw frames from stdin) ---
-            "-f", "rawvideo",
-            "-pix_fmt", "bgr24",
-            "-s", f"{self.width}x{self.height}",
-            "-r", str(self.current_fps),
-            "-i", "-",
-
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            "-s",
+            f"{self.width}x{self.height}",
+            "-r",
+            str(self.current_fps),
+            "-i",
+            "-",
             # --- Video encoding ---
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-tune", "zerolatency",
-            "-b:v", f"{int(400 * self.current_fps / 15)}k",
-            "-g", str(max(15, int(self.current_fps * 2))),
-            "-keyint_min", str(max(5, int(self.current_fps / 2))),
-            "-vsync", "cfr",
-
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-tune",
+            "zerolatency",
+            "-b:v",
+            f"{int(400 * self.current_fps / 15)}k",
+            "-g",
+            str(max(15, int(self.current_fps * 2))),
+            "-keyint_min",
+            str(max(5, int(self.current_fps / 2))),
+            "-vsync",
+            "cfr",
             # --- Output ---
-            "-f", "rtsp",
-            "-rtsp_transport", "tcp",
-            "rtsp://localhost:8554/down_camera"
+            "-f",
+            "rtsp",
+            "-rtsp_transport",
+            "tcp",
+            "rtsp://localhost:8554/down_camera",
         ]
 
         try:
@@ -139,7 +156,9 @@ class D435RGBStream(Node):
                 stderr=subprocess.DEVNULL,
                 bufsize=self.width * self.height * 3 * 3,
             )
-            self.get_logger().info(f"FFmpeg streaming process started with PID: {self.ffmpeg_process.pid}")
+            self.get_logger().info(
+                f"FFmpeg streaming process started with PID: {self.ffmpeg_process.pid}"
+            )
             self.restart_needed = False
         except Exception as e:
             self.get_logger().error(f"Failed to start FFmpeg process: {e}")
@@ -153,7 +172,9 @@ class D435RGBStream(Node):
             return
 
         image_data = msg.data
-        self.get_logger().debug(f"Received camera image sample of size: {len(image_data)} bytes")
+        self.get_logger().debug(
+            f"Received camera image sample of size: {len(image_data)} bytes"
+        )
 
         if self.api_key and self.api_key_id:
             self.process_and_queue_image(image_data)
@@ -207,7 +228,9 @@ class D435RGBStream(Node):
                     pass
 
         except ValueError as e:
-            self.get_logger().error(f"Error reshaping image data: {e}. Expected size: {self.height * self.width * 3}, got: {len(image_data)}")
+            self.get_logger().error(
+                f"Error reshaping image data: {e}. Expected size: {self.height * self.width * 3}, got: {len(image_data)}"
+            )
         except Exception as e:
             self.get_logger().error(f"Error processing image: {e}")
 
@@ -265,7 +288,7 @@ class D435RGBStream(Node):
         Cleanup on node destruction
         """
         self.stop_event.set()
-        if hasattr(self, 'writer_thread'):
+        if hasattr(self, "writer_thread"):
             self.writer_thread.join(timeout=5)
 
         if self.ffmpeg_process:
@@ -291,6 +314,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

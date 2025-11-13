@@ -4,18 +4,23 @@
 """
 Run me like this (single terminal):
 
-PYTHONNOUSERSITE=1 python3 local_traversability_node.py --ros-args \
+/home/openmind/Desktop/wendy-work-station/unitree_go2_ros2_sdk/local_traversability_node.py \
+--ros-args \
+  -p cloud_topic:=/camera/depth/points \
   -p target_frame:=odom \
+  -p hazard_output_frame:=laser \
+  -p hazard_output_topic_pc2:=/traversability/hazard_points2 \
   -p grid_res:=0.05 -p grid_size:=5.0 \
   -p max_range:=2.0 -p half_width:=2.5 \
   -p slope_deg_thresh:=10.0 -p downhill_deg_thresh:=8.0 \
   -p step_thresh_m:=0.12 -p hole_thresh_m:=0.15 \
   -p down_step_thresh_m:=0.10 -p down_step_k_max:=6 \
-  -p slope_baseline_cells:=3 \
   -p gradual_drop_window_m:=0.30 -p gradual_drop_thresh_m:=0.10 \
   -p unknown_ahead_window_m:=0.15 -p unknown_ahead_frac_thresh:=0.85 \
   -p min_block_window_m:=0.20 \
-  -p cloud_topic:=/camera/depth/points
+  -p inflate_radius_m:=0.0 \
+  -p hazard_include_unknown:=false \
+  -p hazard_stride:=1
 """
 
 import atexit

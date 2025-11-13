@@ -4,6 +4,7 @@
 """
 PYTHONNOUSERSITE=1 python3 /home/openmind/Desktop/wendy-work-station/unitree_go2_ros2_sdk/go2_sdk/go2_sdk/om_path_trave_base.py \
   --ros-args -p hazard_topic_pc2:=/traversability/hazard_points2
+
 """
 
 import math
@@ -19,9 +20,26 @@ from visualization_msgs.msg import Marker, MarkerArray
 from om_api.msg import Paths
 
 
-# ---------------- path library (0° = +X forward, +Y left) ----------------
-def create_straight_line_path_from_angle(angle_deg, length=1.05, num_points=10):
-    a = math.radians(angle_deg)
+# ---------------- path library (逻辑保持：0° = +X forward, +Y left) ----------------
+def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=10):
+    """
+    Create a straight-line path in the robot frame.
+
+    Parameters
+    ----------
+    angle_degrees : float
+        Path heading in degrees where 0° is +X (forward) and +Y is left.
+    length : float, optional
+        Total path length in meters (default 1.05).
+    num_points : int, optional
+        Number of points sampled along the path (default 10).
+
+    Returns
+    -------
+    np.ndarray
+        A (2, num_points) array where row 0 is x values and row 1 is y values.
+    """
+    a = math.radians(angle_degrees)
     end_x = length * math.cos(a)  # +X forward
     end_y = length * math.sin(a)  # +Y left
     x_vals = np.linspace(0.0, end_x, num_points)
@@ -29,42 +47,38 @@ def create_straight_line_path_from_angle(angle_deg, length=1.05, num_points=10):
     return np.array([x_vals, y_vals])
 
 
-PATH_ANGLES = [-60, -45, -30, -15, 0, 15, 30, 45, 60, 180]
-PATH_LEN = 1.05
-PATHS = [create_straight_line_path_from_angle(a, PATH_LEN) for a in PATH_ANGLES]
+# 对齐旧版命名：path_angles / path_length / paths
+path_angles = [-60, -45, -30, -15, 0, 15, 30, 45, 60, 180]
+path_length = 1.05
+paths = [create_straight_line_path_from_angle(a, path_length) for a in path_angles]
 
 
 class OMPath(Node):
     """
-    - Obstacles: LaserScan + depth PointCloud (same logic as before).
-    - Hazards: subscribe to /traversability/hazard_points2 (or /traversability/hazard_points).
-      Hazards only affect the 9 forward rays (0..8). Backward ray (9) ignores hazards.
-    - All computations are done in the **robot-centric frame** (0° = +X forward, +Y left).
-      We convert incoming hazard points (published in 'laser') into the robot frame by
-      rotating them by the lidar mounting yaw.
-    - RViz markers are rotated by viz_yaw_deg for display only.
+    ROS 2 node that fuses LaserScan, depth obstacles, and hazard PointCloud2 to
+    select feasible straight-line paths and publish RViz markers.
+
+    - All computation is in robot frame (+X forward, +Y left).
+    - Hazards affect only forward rays (indices 0..8); the backward ray (index 9) ignores hazards.
+    - RViz visualization is rotated by -sensor_mounting_angle for display only.
     """
 
     def __init__(self):
+
         super().__init__("om_path")
 
-        # Params
         self.declare_parameter("scan_topic", "/scan")
         self.declare_parameter(
             "depth_obstacle_topic",
             "/camera/realsense2_camera_node/depth/obstacle_point",
         )
         self.declare_parameter("laser_frame", "laser")
-        self.declare_parameter(
-            "sensor_mounting_angle", 172.0
-        )  # deg, +CCW sensor->robot  # <<< same as before
+        self.declare_parameter("sensor_mounting_angle", 172.0)
         self.declare_parameter("relevant_distance_min", 0.20)
         self.declare_parameter("half_width_robot", 0.20)
         self.declare_parameter("obstacle_threshold", 0.50)
         self.declare_parameter("hazard_topic_pc2", "/traversability/hazard_points2")
-        self.declare_parameter("hazard_topic_pc", "/traversability/hazard_points")
 
-        # Read params
         self.scan_topic = (
             self.get_parameter("scan_topic").get_parameter_value().string_value
         )
@@ -76,45 +90,74 @@ class OMPath(Node):
         self.laser_frame = (
             self.get_parameter("laser_frame").get_parameter_value().string_value
         )
-        self.mount_deg = float(self.get_parameter("sensor_mounting_angle").value)
-        self.min_dist = float(self.get_parameter("relevant_distance_min").value)
-        self.half_width = float(self.get_parameter("half_width_robot").value)
-        self.obs_thresh = float(self.get_parameter("obstacle_threshold").value)
+
+        self.sensor_mounting_angle = float(
+            self.get_parameter("sensor_mounting_angle").value
+        )
+        self.relevant_distance_min = float(
+            self.get_parameter("relevant_distance_min").value
+        )
+        self.half_width_robot = float(self.get_parameter("half_width_robot").value)
+        self.obstacle_threshold = float(self.get_parameter("obstacle_threshold").value)
 
         self.hazard_topic_pc2 = (
             self.get_parameter("hazard_topic_pc2").get_parameter_value().string_value
         )
 
-        # State
-        self.obstacle_cloud: PointCloud | None = None
-        self.hazard_xy_robot = np.zeros(
-            (0, 2), dtype=np.float32
-        )  # <<< CHANGED: store hazards already rotated into ROBOT frame
+        self.obstacle: PointCloud | None = None
+        self.hazard_xy_robot = np.zeros((0, 2), dtype=np.float32)
 
-        # Subs
-        self.create_subscription(LaserScan, self.scan_topic, self.scan_cb, 10)
+        self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, 10)
         self.create_subscription(
-            PointCloud, self.depth_topic, self.depth_obstacle_cb, 10
+            PointCloud, self.depth_topic, self.obstacle_callback, 10
         )
         self.create_subscription(
-            PointCloud2, self.hazard_topic_pc2, self.hazard_pc2_cb, 10
+            PointCloud2, self.hazard_topic_pc2, self.hazard_callback_pc2, 10
         )
 
-        # Pubs
         self.paths_pub = self.create_publisher(Paths, "/om/paths", 10)
         self.markers_pub = self.create_publisher(MarkerArray, "/om/paths_markers", 10)
 
-        self.get_logger().info(
-            "OMPath (obstacles + hazard PC2, all in robot frame, no OccupancyGrid) started."
-        )
+        self.get_logger().info("OMPath (obstacles + hazard PC2, robot-frame) started.")
 
-    # ---------- helpers ----------
     def _rot_xy(self, x, y, yaw_deg):
+        """
+        Rotate a 2D point (x, y) by yaw_deg in degrees.
+
+        Parameters
+        ----------
+        x : float
+            X coordinate in the source frame.
+        y : float
+            Y coordinate in the source frame.
+        yaw_deg : float
+            Rotation angle in degrees, +CCW.
+
+        Returns
+        -------
+        tuple[float, float]
+            Rotated (x', y') coordinates.
+        """
         r = math.radians(yaw_deg)
         c, s = math.cos(r), math.sin(r)
         return (x * c - y * s, x * s + y * c)
 
     def _rot_array_deg(self, arr_xy, yaw_deg):
+        """
+        Rotate an Nx2 array of 2D points by yaw_deg in degrees.
+
+        Parameters
+        ----------
+        arr_xy : np.ndarray
+            Array with shape (N, 2) containing [x, y] rows.
+        yaw_deg : float
+            Rotation angle in degrees, +CCW.
+
+        Returns
+        -------
+        np.ndarray
+            Rotated array of shape (N, 2).
+        """
         if arr_xy.size == 0:
             return arr_xy
         r = math.radians(yaw_deg)
@@ -125,7 +168,24 @@ class OMPath(Node):
         yr = s * x + c * y
         return np.stack([xr, yr], axis=1)
 
-    def _dist_pt_to_segment(self, px, py, x1, y1, x2, y2):
+    def distance_point_to_line_segment(self, px, py, x1, y1, x2, y2):
+        """
+        Compute the distance from a point to a line segment.
+
+        Parameters
+        ----------
+        px, py : float
+            Point coordinates.
+        x1, y1 : float
+            Segment start coordinates.
+        x2, y2 : float
+            Segment end coordinates.
+
+        Returns
+        -------
+        float
+            Euclidean distance from (px, py) to the closest point on the segment.
+        """
         dx, dy = x2 - x1, y2 - y1
         if dx == 0.0 and dy == 0.0:
             return math.hypot(px - x1, py - y1)
@@ -134,37 +194,69 @@ class OMPath(Node):
         cx, cy = x1 + t * dx, y1 + t * dy
         return math.hypot(px - cx, py - cy)
 
-    # ---------- callbacks ----------
-    def depth_obstacle_cb(self, msg: PointCloud):
-        self.obstacle_cloud = msg
+    def obstacle_callback(self, msg: PointCloud):
+        """
+        Receive and store the depth-obstacle PointCloud.
 
-    def hazard_pc2_cb(self, msg: PointCloud2):
+        Parameters
+        ----------
+        msg : sensor_msgs.msg.PointCloud
+            Obstacle cloud (assumed already in the robot frame).
+
+        Returns
+        -------
+        None
+        """
+        self.obstacle = msg
+
+    def hazard_callback_pc2(self, msg: PointCloud2):
+        """
+        Receive hazard points (PointCloud2) and rotate them into the robot frame.
+
+        Parameters
+        ----------
+        msg : sensor_msgs.msg.PointCloud2
+            Hazard point cloud published in the LASER frame (x, y fields used).
+
+        Returns
+        -------
+        None
+        """
         try:
             arr = pc2.read_points_numpy(msg, field_names=("x", "y"), skip_nans=True)
             arr = np.asarray(arr, dtype=np.float32).reshape(-1, 2)
-            # Convert hazards from LASER frame to ROBOT frame by the SAME mounting yaw  # <<< CHANGED
-            self.hazard_xy_robot = self._rot_array_deg(arr, self.mount_deg)
+            # hazard 来自 laser，需要转到“机器人系”：用相同的安装角（+CCW）
+            self.hazard_xy_robot = self._rot_array_deg(arr, self.sensor_mounting_angle)
         except Exception as e:
             self.get_logger().warn(f"Failed to parse hazard_points2: {e}")
 
-    def scan_cb(self, scan: LaserScan):
-        # 1) LaserScan -> points in ROBOT frame (by adding mounting yaw)
-        mount = math.radians(self.mount_deg)
+    def scan_callback(self, scan: LaserScan):
+        """
+        Fuse LaserScan, depth obstacles, and hazards; select feasible paths; publish markers.
+
+        Parameters
+        ----------
+        scan : sensor_msgs.msg.LaserScan
+            Laser scan in sensor frame (will be rotated into robot frame by sensor_mounting_angle).
+
+        Returns
+        -------
+        None
+        """
+
+        mount = math.radians(self.sensor_mounting_angle)
         complexes = []
         for i, d_m in enumerate(scan.ranges):
-            if not math.isfinite(d_m) or d_m > 5.0 or d_m < self.min_dist:
+            if not math.isfinite(d_m) or d_m > 5.0 or d_m < self.relevant_distance_min:
                 continue
             theta = scan.angle_min + i * scan.angle_increment + mount  # sensor -> robot
-            #  把极坐标（距离 d 和方位 θ）转成笛卡尔坐标（x,y）
             x = d_m * math.cos(theta)  # +X forward
             y = d_m * math.sin(theta)  # +Y left
-            # 把弧度 theta 转成角度，并且归一化到 (-180, 180] eg: 350 degree into -10 degree, left pos right neg
             a_deg = ((math.degrees(theta) + 180.0) % 360.0) - 180.0
             complexes.append([x, y, a_deg, d_m])
 
-        # 2) Add depth obstacles (assumed also already in ROBOT frame; if not, add a TF/rotation here)
-        if self.obstacle_cloud and len(self.obstacle_cloud.points) > self.obs_thresh:
-            for p in self.obstacle_cloud.points:
+        if self.obstacle and len(self.obstacle.points) > self.obstacle_threshold:
+            for p in self.obstacle.points:
                 x, y = float(p.x), float(p.y)
                 d = math.hypot(x, y)
                 a = math.degrees(math.atan2(y, x))
@@ -177,11 +269,10 @@ class OMPath(Node):
         arr = arr[arr[:, 2].argsort()]
         X, Y, D = arr[:, 0], arr[:, 1], arr[:, 3]
 
-        N = len(PATH_ANGLES)  # 10
-
+        N = len(path_angles)  # 10
         segments = np.array(
             [
-                (PATHS[i][0][0], PATHS[i][1][0], PATHS[i][0][-1], PATHS[i][1][-1])
+                (paths[i][0][0], paths[i][1][0], paths[i][0][-1], paths[i][1][-1])
                 for i in range(N)
             ],
             dtype=np.float32,
@@ -192,15 +283,18 @@ class OMPath(Node):
 
         for x, y, _ in zip(X, Y, D):
             for idx in range(N):
+                # 后退（idx=9）只看后侧
                 if idx == 9 and x >= 0.0:
                     continue
                 if blocked_by_obstacle[idx]:
                     continue
                 x1, y1, x2, y2 = segments[idx]
-                if self._dist_pt_to_segment(x, y, x1, y1, x2, y2) <= self.half_width:
+                if (
+                    self.distance_point_to_line_segment(x, y, x1, y1, x2, y2)
+                    <= self.half_width_robot
+                ):
                     blocked_by_obstacle[idx] = True
 
-        # 3.2 hazard 命中：只作用于前向 0..8
         if self.hazard_xy_robot.size > 0:
             for hx, hy in self.hazard_xy_robot:
                 for idx in range(0, N - 1):  # 0..8
@@ -208,8 +302,8 @@ class OMPath(Node):
                         continue
                     x1, y1, x2, y2 = segments[idx]
                     if (
-                        self._dist_pt_to_segment(hx, hy, x1, y1, x2, y2)
-                        <= self.half_width
+                        self.distance_point_to_line_segment(hx, hy, x1, y1, x2, y2)
+                        <= self.half_width_robot
                     ):
                         blocked_by_hazard[idx] = True
 
@@ -222,8 +316,12 @@ class OMPath(Node):
         msg_paths.header.stamp = stamp
         msg_paths.header.frame_id = self.laser_frame
         msg_paths.paths = possible
-        msg_paths.blocked_by_obstacle = blocked_by_obstacle
-        msg_paths.blocked_by_hazard = blocked_by_hazard
+
+        if hasattr(msg_paths, "blocked_by_obstacle"):
+            msg_paths.blocked_by_obstacle = blocked_by_obstacle
+        if hasattr(msg_paths, "blocked_by_hazard"):
+            msg_paths.blocked_by_hazard = blocked_by_hazard
+
         self.paths_pub.publish(msg_paths)
 
         bad_union = {
@@ -242,6 +340,24 @@ class OMPath(Node):
     def _publish_markers(
         self, possible_paths, bad_paths, obstacles_xy, hazards_xy, frame_id, stamp
     ):
+        """
+        Publish RViz markers for candidate paths, obstacles, and hazards.
+
+        Parameters
+        ----------
+        possible_paths : set[int]
+            Indices of feasible paths.
+        bad_paths : set[int]
+            Indices of blocked paths (by obstacle and/or hazard).
+        obstacles_xy : list[tuple[float, float]]
+            Obstacle points (x, y) in robot frame.
+        hazards_xy : list[list[float]] | list[tuple[float, float]]
+            Hazard points (x, y) in robot frame.
+        frame_id : str
+            TF frame to attach the markers to (usually 'laser').
+        stamp : builtin_interfaces.msg.Time
+            Timestamp for the markers.
+        """
         ma = MarkerArray()
 
         wipe = Marker()
@@ -251,7 +367,7 @@ class OMPath(Node):
         ma.markers.append(wipe)
 
         # Rays
-        for idx, path_arr in enumerate(PATHS):
+        for idx, path_arr in enumerate(paths):
             line = Marker()
             line.header.frame_id = frame_id
             line.header.stamp = stamp
@@ -284,7 +400,9 @@ class OMPath(Node):
                 )
 
             for x, y in zip(path_arr[0], path_arr[1]):
-                px, py = self._rot_xy(float(x), float(y), -self.mount_deg)
+                px, py = self._rot_xy(
+                    float(x), float(y), -self.sensor_mounting_angle
+                )  # 显示用旋转
                 line.points.append(Point(x=px, y=py, z=0.0))
             ma.markers.append(line)
 
@@ -300,11 +418,13 @@ class OMPath(Node):
             t.color.r = t.color.g = t.color.b = 1.0
             t.color.a = 0.9
             ex, ey = float(path_arr[0][-1]), float(path_arr[1][-1])
-            tx, ty = self._rot_xy(ex, ey, -self.mount_deg)
+            tx, ty = self._rot_xy(ex, ey, -self.sensor_mounting_angle)
             t.pose.position.x = tx
             t.pose.position.y = ty
             t.pose.position.z = 0.06
-            ang_disp = ((PATH_ANGLES[idx] - self.mount_deg + 180.0) % 360.0) - 180.0
+            ang_disp = (
+                (path_angles[idx] - self.sensor_mounting_angle + 180.0) % 360.0
+            ) - 180.0
             t.text = f"{idx} ({int(ang_disp)}°)"
             ma.markers.append(t)
 
@@ -320,11 +440,11 @@ class OMPath(Node):
             pts.scale.x = pts.scale.y = 0.03
             pts.color.r, pts.color.g, pts.color.b, pts.color.a = 1.0, 0.5, 0.0, 0.9
             for x, y in obstacles_xy:
-                px, py = self._rot_xy(float(x), float(y), -self.mount_deg)
+                px, py = self._rot_xy(float(x), float(y), -self.sensor_mounting_angle)
                 pts.points.append(Point(x=px, y=py, z=0.0))
             ma.markers.append(pts)
 
-        # Hazards (blue) — already in ROBOT frame; rotate only for display
+        # Hazards (blue) — 已在机器人系；仅显示旋转
         if hazards_xy:
             h = Marker()
             h.header.frame_id = frame_id
@@ -336,7 +456,7 @@ class OMPath(Node):
             h.scale.x = h.scale.y = 0.035
             h.color.r, h.color.g, h.color.b, h.color.a = 0.2, 0.5, 0.9, 0.9
             for x, y in hazards_xy:
-                px, py = self._rot_xy(float(x), float(y), -self.mount_deg)
+                px, py = self._rot_xy(float(x), float(y), -self.sensor_mounting_angle)
                 h.points.append(Point(x=px, y=py, z=0.0))
             ma.markers.append(h)
 
@@ -344,6 +464,9 @@ class OMPath(Node):
 
 
 def main(args=None):
+    """
+    Entry point: initialize rclpy, spin the OMPath node, and shut down.
+    """
     rclpy.init(args=args)
     node = OMPath()
     try:

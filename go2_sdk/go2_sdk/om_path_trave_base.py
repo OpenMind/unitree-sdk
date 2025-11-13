@@ -20,7 +20,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 from om_api.msg import Paths
 
 
-# ---------------- path library (逻辑保持：0° = +X forward, +Y left) ----------------
 def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=10):
     """
     Create a straight-line path in the robot frame.
@@ -47,7 +46,6 @@ def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=
     return np.array([x_vals, y_vals])
 
 
-# 对齐旧版命名：path_angles / path_length / paths
 path_angles = [-60, -45, -30, -15, 0, 15, 30, 45, 60, 180]
 path_length = 1.05
 paths = [create_straight_line_path_from_angle(a, path_length) for a in path_angles]
@@ -400,9 +398,7 @@ class OMPath(Node):
                 )
 
             for x, y in zip(path_arr[0], path_arr[1]):
-                px, py = self._rot_xy(
-                    float(x), float(y), -self.sensor_mounting_angle
-                )  # 显示用旋转
+                px, py = self._rot_xy(float(x), float(y), -self.sensor_mounting_angle)
                 line.points.append(Point(x=px, y=py, z=0.0))
             ma.markers.append(line)
 
@@ -444,7 +440,6 @@ class OMPath(Node):
                 pts.points.append(Point(x=px, y=py, z=0.0))
             ma.markers.append(pts)
 
-        # Hazards (blue) — 已在机器人系；仅显示旋转
         if hazards_xy:
             h = Marker()
             h.header.frame_id = frame_id

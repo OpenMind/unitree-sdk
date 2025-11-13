@@ -464,9 +464,6 @@ class Go2LidarLocalizationNode(Node):
         # Convert map data to numpy array
         data = np.array(self.map_msg.data, dtype=np.int8).reshape((height, width))
 
-        # Create image with gray background (128) - matching C++ behavior
-        map_raw = np.full((height, width), 128, dtype=np.uint8)
-
         # Copy the actual map data
         map_raw = data.astype(np.uint8)
 
@@ -645,14 +642,14 @@ class Go2LidarLocalizationNode(Node):
             self.last_velocity_check_time = current_time
 
         except (TransformException, Exception) as e:
-            pass
+            self.get_logger().debug(f"Velocity update failed: {str(e)}")
 
     def predict_pose_from_odometry(self):
         """
         Use odometry to predict where robot moved since last update
         """
         # Avoid the pose prediction on the global localization first run
-        if self.is_pose_estimated == False:
+        if not self.is_pose_estimated:
             self.is_pose_estimated = True
             return
 

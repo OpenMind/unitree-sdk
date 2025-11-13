@@ -223,7 +223,6 @@ class OMPath(Node):
         try:
             arr = pc2.read_points_numpy(msg, field_names=("x", "y"), skip_nans=True)
             arr = np.asarray(arr, dtype=np.float32).reshape(-1, 2)
-            # hazard 来自 laser，需要转到“机器人系”：用相同的安装角（+CCW）
             self.hazard_xy_robot = self._rot_array_deg(arr, self.sensor_mounting_angle)
         except Exception as e:
             self.get_logger().warn(f"Failed to parse hazard_points2: {e}")

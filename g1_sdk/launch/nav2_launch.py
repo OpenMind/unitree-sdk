@@ -112,5 +112,5 @@ def generate_launch_description():
                        ('/cmd_vel_smoothed', '/cmd_vel')]
         ),
 
-        # map_server and amcl nodes removed as requested
+        
     ])

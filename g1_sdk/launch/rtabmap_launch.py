@@ -17,11 +17,6 @@ def generate_launch_description():
     # Get package directories
     g1_pkg_dir = get_package_share_directory('g1_sdk')
     
-    # Load URDF file
-    urdf_file = os.path.join(g1_pkg_dir, 'urdf', 'g1_23dof.urdf')
-    with open(urdf_file, 'r') as infp:
-        robot_desc = infp.read()
-    
     # RTAB-Map parameters
     parameters = [{
         'frame_id': 'base_link',  # For humanoid, typically base_link or pelvis
@@ -132,41 +127,6 @@ def generate_launch_description():
             description='Launch RViz for visualization'
         ),
         
-        # G1 Joint State Publisher Node
-        Node(
-            package='g1_sdk',
-            executable='g1_jointstate',
-            name='g1_jointstate',
-            output='screen',
-        ),
-        
-        # G1 Odometry Node
-        Node(
-            package='g1_sdk',
-            executable='g1_odom',
-            name='g1_odom',
-            output='screen',
-        ),
-        
-        # Robot State Publisher
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='robot_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': robot_desc}]
-        ),
-        
-        # Joint State Publisher (commented out as in original - likely because g1_jointstate provides this)
-        # Node(
-        #     package='joint_state_publisher',
-        #     executable='joint_state_publisher',
-        #     name='joint_state_publisher',
-        #     output='screen',
-        # ),
-        
-        # Remove Livox driver node since it's already running
-        # The driver publishes to /utlidar/cloud_livox_mid360 and /utlidar/imu_livox_mid360
         
         # RTAB-Map node
         Node(
@@ -228,8 +188,6 @@ def generate_launch_description():
             ]
         ),
         
-        # Remove static transform publisher - transforms are already published by your system
-        # The TF tree shows base_footprint -> base_link -> other frames are already connected
         
         # Map assembler node
         Node(

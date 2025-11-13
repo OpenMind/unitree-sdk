@@ -99,7 +99,7 @@ class Go2LidarLocalizationNode(Node):
 
         # Service for triggering global localization
         self.global_loc_service = self.create_service(
-            Empty, "global_localization", self.global_localization_callback
+            Empty, "/om/global_localization", self.global_localization_callback
         )
 
         # Publisher for localization pose information

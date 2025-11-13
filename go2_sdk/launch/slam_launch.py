@@ -23,7 +23,6 @@ def generate_launch_description():
     inverted = LaunchConfiguration("inverted", default="false")
     angle_compensate = LaunchConfiguration("angle_compensate", default="true")
     scan_mode = LaunchConfiguration("scan_mode", default="Sensitivity")
-    use_nav2 = LaunchConfiguration("use_nav2", default="true")
     map_yaml_file = LaunchConfiguration("map_yaml_file", default="")
 
     return LaunchDescription(
@@ -62,11 +61,6 @@ def generate_launch_description():
                 "scan_mode",
                 default_value=scan_mode,
                 description="Specifying scan mode of lidar",
-            ),
-            DeclareLaunchArgument(
-                "use_nav2",
-                default_value=use_nav2,
-                description="Whether to launch Nav2 navigation stack",
             ),
             DeclareLaunchArgument(
                 "map_yaml_file",

@@ -1,43 +1,55 @@
-import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-import numpy as np
 from collections import deque
-from math import cos, sin, pi, hypot
-from tf2_ros import TransformBroadcaster, Buffer, TransformListener
-from geometry_msgs.msg import TransformStamped, PoseWithCovarianceStamped
-from nav_msgs.msg import OccupancyGrid
-from sensor_msgs.msg import LaserScan
+from math import cos, hypot, pi, sin
+from typing import Any
+
+import numpy as np
+import rclpy
 import tf_transformations
-from tf2_ros import TransformException
+from geometry_msgs.msg import Point, Pose, PoseWithCovarianceStamped, TransformStamped
+from nav_msgs.msg import OccupancyGrid
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Header
+from std_srvs.srv import Empty
+from tf2_ros import Buffer, TransformBroadcaster, TransformException, TransformListener
+
+from om_api.msg import LocalizationPose
 
 
 class Go2LidarLocalizationNode(Node):
     def __init__(self):
-        super().__init__('go2_lidar_localization')
+        super().__init__("go2_lidar_localization")
 
         # Declare parameters
-        self.declare_parameter('base_frame', 'base_link')
-        self.declare_parameter('odom_frame', 'odom')
-        self.declare_parameter('laser_frame', 'laser')
-        self.declare_parameter('laser_topic', 'scan')
-        self.declare_parameter('velocity_threshold', 0.3)  # m/s
-        self.declare_parameter('scan_match_interval', 0.2)  # seconds
+        self.declare_parameter("base_frame", "base_link")
+        self.declare_parameter("odom_frame", "odom")
+        self.declare_parameter("laser_frame", "laser")
+        self.declare_parameter("laser_topic", "scan")
+        self.declare_parameter("velocity_threshold", 0.3)  # m/s
+        self.declare_parameter("scan_match_interval", 0.2)  # seconds
+        self.declare_parameter(
+            "global_localization_particles", 10000
+        )  # Number of random samples
+        self.declare_parameter("enable_auto_init", True)  # Auto-initialize on startup
 
         # Get parameters
-        self.base_frame = self.get_parameter('base_frame').value
-        self.odom_frame = self.get_parameter('odom_frame').value
-        self.laser_frame = self.get_parameter('laser_frame').value
-        self.laser_topic = self.get_parameter('laser_topic').value
-        self.velocity_threshold = self.get_parameter('velocity_threshold').value
-        self.scan_match_interval = self.get_parameter('scan_match_interval').value
+        self.base_frame = self.get_parameter("base_frame").value
+        self.odom_frame = self.get_parameter("odom_frame").value
+        self.laser_frame = self.get_parameter("laser_frame").value
+        self.laser_topic = self.get_parameter("laser_topic").value
+        self.velocity_threshold = self.get_parameter("velocity_threshold").value
+        self.scan_match_interval = self.get_parameter("scan_match_interval").value
+        self.n_particles = self.get_parameter("global_localization_particles").value
+        self.enable_auto_init = self.get_parameter("enable_auto_init").value
 
         # Initialize variables
         self.map_msg = None
         self.map_cropped = None
         self.map_temp = None
-        self.map_roi_info = {'x_offset': 0, 'y_offset': 0, 'width': 0, 'height': 0}
+        self.map_roi_info = {"x_offset": 0, "y_offset": 0, "width": 0, "height": 0}
         self.scan_points = []
+        self.free_space_points = []  # Store free space locations for sampling
 
         self.lidar_x = 250.0
         self.lidar_y = 250.0
@@ -46,6 +58,11 @@ class Go2LidarLocalizationNode(Node):
         self.clear_countdown = -1
         self.scan_count = 0
         self.data_queue = deque(maxlen=10)
+
+        # Global localization state
+        self.is_initialized = False
+        self.last_match_quality = 0.0
+        self.buffered_scan = None  # Store scan for global localization
 
         # Odometry tracking for motion prediction
         self.last_odom_pose = None  # (x, y, yaw)
@@ -59,41 +76,46 @@ class Go2LidarLocalizationNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # Subscribers
-        map_qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-
         self.map_sub = self.create_subscription(
             OccupancyGrid,
-            '/map',
+            "/map",
             self.map_callback,
-            map_qos
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=1,
+            ),
         )
 
         self.scan_sub = self.create_subscription(
             LaserScan,
             self.laser_topic,
             self.scan_callback,
-            10
+            10,
         )
 
         self.initial_pose_sub = self.create_subscription(
-            PoseWithCovarianceStamped,
-            'initialpose',
-            self.initial_pose_callback,
-            10
+            PoseWithCovarianceStamped, "initialpose", self.initial_pose_callback, 10
+        )
+
+        # Service for triggering global localization
+        self.global_loc_service = self.create_service(
+            Empty, "global_localization", self.global_localization_callback
+        )
+
+        # Publisher for localization pose information
+        self.localization_pose_pub = self.create_publisher(
+            LocalizationPose, "/om/localization_pose", 10
         )
 
         # Timer for publishing TF at 30Hz
-        self.tf_timer = self.create_timer(1.0/30.0, self.pose_tf)
+        self.tf_timer = self.create_timer(1.0 / 30.0, self.pose_tf)
 
-        self.get_logger().info('Lidar localization node initialized')
-        self.get_logger().info(f'Velocity threshold: {self.velocity_threshold} m/s')
-        self.get_logger().info(f'Scan match interval: {self.scan_match_interval} s')
+        self.get_logger().info("Lidar localization node initialized")
+        self.get_logger().info(f"Velocity threshold: {self.velocity_threshold} m/s")
+        self.get_logger().info(f"Scan match interval: {self.scan_match_interval} s")
+        self.get_logger().info(f"Global localization particles: {self.n_particles}")
 
     def initial_pose_callback(self, msg: PoseWithCovarianceStamped):
         """
@@ -101,11 +123,11 @@ class Go2LidarLocalizationNode(Node):
 
         Parameters
         ----------
-        msg : geometry_msgs.msg.PoseWithCovarianceStamped
-            The incoming initial pose message.
+        msg: PoseWithCovarianceStamped
+            Incoming initial pose message
         """
         if self.map_msg is None or self.map_msg.info.resolution <= 0:
-            self.get_logger().error('Map info invalid or not received')
+            self.get_logger().error("Map info invalid or not received")
             return
 
         # Extract position and orientation from message
@@ -118,19 +140,20 @@ class Go2LidarLocalizationNode(Node):
         _, _, yaw = tf_transformations.euler_from_quaternion(quaternion)
 
         # Convert map coordinates to cropped map grid coordinates
-        self.lidar_x = (map_x - self.map_msg.info.origin.position.x) / \
-                       self.map_msg.info.resolution - self.map_roi_info['x_offset']
-        self.lidar_y = (map_y - self.map_msg.info.origin.position.y) / \
-                       self.map_msg.info.resolution - self.map_roi_info['y_offset']
+        self.lidar_x = (
+            map_x - self.map_msg.info.origin.position.x
+        ) / self.map_msg.info.resolution - self.map_roi_info["x_offset"]
+        self.lidar_y = (
+            map_y - self.map_msg.info.origin.position.y
+        ) / self.map_msg.info.resolution - self.map_roi_info["y_offset"]
 
         self.lidar_yaw = -yaw
         self.clear_countdown = 30
+        self.is_initialized = True
 
         # Reset odometry tracking
         self.last_odom_pose = None
         self.last_scan_match_time = None
-
-        self.get_logger().info(f'Initial pose set: x={self.lidar_x:.2f}, y={self.lidar_y:.2f}, yaw={self.lidar_yaw:.2f}')
 
     def map_callback(self, msg: OccupancyGrid):
         """
@@ -138,13 +161,293 @@ class Go2LidarLocalizationNode(Node):
 
         Parameters
         ----------
-        msg : nav_msgs.msg.OccupancyGrid
-            The incoming map message.
+        msg: OccupancyGrid
+            Incoming map message
         """
-        self.get_logger().info('Map received')
         self.map_msg = msg
         self.crop_map()
         self.process_map()
+        self.extract_free_space()
+
+    def extract_free_space(self):
+        """
+        Extract free space points for random sampling
+        """
+        if self.map_cropped is None:
+            return
+
+        # Find free space (value = 0 in occupancy grid)
+        # We want to sample from areas that are definitely free
+        free_cells = np.where(self.map_cropped == 0)
+
+        if len(free_cells[0]) == 0:
+            self.get_logger().warn("No free space found in map!")
+            return
+
+        # Store as (x, y) tuples in cropped map coordinates
+        self.free_space_points = list(zip(free_cells[1], free_cells[0]))
+
+        self.get_logger().info(
+            f"Found {len(self.free_space_points)} free space cells for sampling"
+        )
+
+    def global_localization_callback(self, request: Any, response: Any) -> Any:
+        """
+        Service callback to trigger global localization
+
+        Parameters
+        ----------
+        request: Any
+            Incoming service request
+        response: Any
+            Service response
+
+        Returns
+        -------
+        Any
+            Service response
+        """
+        self.get_logger().info("Global localization service called")
+
+        if self.buffered_scan is not None:
+            self.perform_global_localization(self.buffered_scan)
+        else:
+            self.get_logger().warn(
+                "No scan available for global localization, will use next scan"
+            )
+            self.is_initialized = False
+
+        return response
+
+    def evaluate_pose_vectorized(
+        self, x: float, y: float, yaw: float, scan_points
+    ) -> float:
+        """
+        Vectorized evaluation of pose - much faster than loop-based version
+
+        Parameters
+        ----------
+        x: float
+            X coordinate in map frame
+        y: float
+            Y coordinate in map frame
+        yaw: float
+            Orientation in radians
+        scan_points: np.ndarray
+            Numpy array of (x, y) points in base frame
+
+        Returns
+        -------
+        float
+            Match score
+        """
+        # Convert scan_points to numpy array if not already
+        if not isinstance(scan_points, np.ndarray):
+            scan_points = np.array(scan_points)
+
+        if len(scan_points) == 0:
+            return 0
+
+        # Precompute trig values
+        cos_yaw = cos(yaw)
+        sin_yaw = sin(yaw)
+
+        # Vectorized rotation and translation
+        rx = scan_points[:, 0] * cos_yaw - scan_points[:, 1] * sin_yaw + x
+        ry = scan_points[:, 0] * sin_yaw + scan_points[:, 1] * cos_yaw
+
+        map_x = rx.astype(int)
+        map_y = (y - ry).astype(int)
+
+        # Filter valid coordinates
+        valid_mask = (
+            (map_x >= 0)
+            & (map_x < self.map_temp.shape[1])
+            & (map_y >= 0)
+            & (map_y < self.map_temp.shape[0])
+        )
+
+        # Sum scores only for valid points
+        if np.any(valid_mask):
+            score = np.sum(self.map_temp[map_y[valid_mask], map_x[valid_mask]])
+        else:
+            score = 0
+
+        return int(score)
+
+    def perform_global_localization(self, scan_msg: LaserScan):
+        """
+        Perform global localization by sampling random poses
+
+        Parameters
+        ----------
+        scan_msg: LaserScan
+            Incoming laser scan message for localization
+        """
+        if len(self.free_space_points) == 0:
+            self.get_logger().error("No free space points available for sampling")
+            return
+
+        self.get_logger().info(
+            f"Starting global localization with {self.n_particles} particles..."
+        )
+
+        # Convert scan to points (reuse existing logic)
+        scan_points = self.convert_scan_to_points(scan_msg)
+
+        if len(scan_points) == 0:
+            self.get_logger().error("No valid scan points for global localization")
+            return
+
+        # Convert to numpy array for vectorized operations
+        scan_points = np.array(scan_points)
+
+        best_score = 0
+        best_pose = None
+
+        # Sample random poses
+        sample_indices = np.random.choice(
+            len(self.free_space_points),
+            min(self.n_particles, len(self.free_space_points)),
+            replace=False,
+        )
+
+        for idx in sample_indices:
+            x, y = self.free_space_points[idx]
+
+            # Try multiple orientations for each position
+            for yaw in np.linspace(0, 2 * pi, 8, endpoint=False):
+                score = self.evaluate_pose_vectorized(x, y, yaw, scan_points)
+
+                if score > best_score:
+                    best_score = score
+                    best_pose = (x, y, yaw)
+
+        if best_pose is not None:
+            self.lidar_x, self.lidar_y, self.lidar_yaw = best_pose
+            self.is_initialized = True
+            self.scan_count = 1
+
+            self.last_odom_pose = None
+            self.last_scan_match_time = None
+            self.last_velocity_pose = None
+            self.last_velocity_check_time = None
+
+            self.scan_points = self.convert_scan_to_points(scan_msg)
+            if len(self.scan_points) > 0:
+                self.match_scan_iterative()
+
+            # Calculate match quality
+            min_score_threshold = len(scan_points) * 30
+
+            if best_score < min_score_threshold:
+                self.get_logger().warn(
+                    f"Low confidence in global localization (score: {best_score} < {min_score_threshold})"
+                )
+        else:
+            self.get_logger().error("Global localization failed - no valid pose found")
+
+    def convert_scan_to_points(self, msg: LaserScan) -> list:
+        """
+        Convert laser scan to points in base frame
+
+        Parameters
+        ----------
+        msg: LaserScan
+            Incoming laser scan message
+
+        Returns
+        -------
+        list
+            List of (x, y) points in base frame
+        """
+        scan_points = []
+
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.base_frame,
+                self.laser_frame,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.1),
+            )
+        except (TransformException, Exception) as e:
+            self.get_logger().warn(f"TF lookup failed: {str(e)}")
+            return scan_points
+
+        # Check if lidar is inverted
+        q = transform.transform.rotation
+        quaternion = [q.x, q.y, q.z, q.w]
+        roll, pitch, yaw = tf_transformations.euler_from_quaternion(quaternion)
+
+        tolerance = 0.1
+        lidar_is_inverted = (abs(abs(roll) - pi) < tolerance) and not (
+            abs(abs(pitch) - pi) < tolerance
+        )
+
+        # Convert scan to points
+        angle = msg.angle_min
+        tx = transform.transform.translation.x
+        ty = transform.transform.translation.y
+
+        for _, r in enumerate(msg.ranges):
+            if msg.range_min <= r <= msg.range_max:
+                x_laser = r * cos(angle)
+                y_laser = -r * sin(angle)
+
+                x_base = x_laser * cos(yaw) - y_laser * sin(yaw) + tx
+                y_base = x_laser * sin(yaw) + y_laser * cos(yaw) + ty
+
+                x_grid = x_base / self.map_msg.info.resolution
+                y_grid = y_base / self.map_msg.info.resolution
+
+                if lidar_is_inverted:
+                    x_grid = -x_grid
+                    y_grid = -y_grid
+
+                scan_points.append((x_grid, y_grid))
+
+            angle += msg.angle_increment
+
+        return scan_points
+
+    def evaluate_pose(self, x: float, y: float, yaw: float, scan_points: list) -> float:
+        """
+        Evaluate how well scan matches at given pose
+
+        Parameters
+        -----------
+        x: float
+            X coordinate in map frame
+        y: float
+            Y coordinate in map frame
+        yaw: float
+            Orientation in radians
+        scan_points: list
+            List of (x, y) points in base frame
+
+        Returns
+        -------
+        float
+            Match score
+        """
+        score = 0
+
+        for px, py in scan_points:
+            # Transform point to map frame
+            rx = px * cos(yaw) - py * sin(yaw)
+            ry = px * sin(yaw) + py * cos(yaw)
+
+            map_x = int(rx + x)
+            map_y = int(y - ry)
+
+            # Check bounds and accumulate gradient value
+            if (
+                0 <= map_x < self.map_temp.shape[1]
+                and 0 <= map_y < self.map_temp.shape[0]
+            ):
+                score += int(self.map_temp[map_y, map_x])
+
+        return score
 
     def crop_map(self):
         """
@@ -170,7 +473,7 @@ class Go2LidarLocalizationNode(Node):
         occupied = np.where(data == 100)
 
         if len(occupied[0]) == 0:
-            self.get_logger().warn('No occupied cells found in map')
+            self.get_logger().warn("No occupied cells found in map")
             return
 
         # Find bounding box of occupied area
@@ -191,25 +494,20 @@ class Go2LidarLocalizationNode(Node):
         new_height = min(new_half_height * 2, height - new_origin_y)
 
         # Crop the map
-        self.map_cropped = map_raw[new_origin_y:new_origin_y+new_height,
-                                    new_origin_x:new_origin_x+new_width].copy()
+        self.map_cropped = map_raw[
+            new_origin_y : new_origin_y + new_height,
+            new_origin_x : new_origin_x + new_width,
+        ].copy()
 
         # Store ROI info
         self.map_roi_info = {
-            'x_offset': new_origin_x,
-            'y_offset': new_origin_y,
-            'width': new_width,
-            'height': new_height
+            "x_offset": new_origin_x,
+            "y_offset": new_origin_y,
+            "width": new_width,
+            "height": new_height,
         }
 
-        # Initialize pose
-        init_pose = PoseWithCovarianceStamped()
-        init_pose.pose.pose.position.x = 0.0
-        init_pose.pose.pose.position.y = 0.0
-        init_pose.pose.pose.orientation.w = 1.0
-        self.initial_pose_callback(init_pose)
-
-        self.get_logger().info(f'Map cropped to {new_width}x{new_height}')
+        self.get_logger().info(f"Map cropped to {new_width}x{new_height}")
 
     def create_gradient_mask(self, size: int) -> np.ndarray:
         """
@@ -218,12 +516,12 @@ class Go2LidarLocalizationNode(Node):
         Parameters
         ----------
         size : int
-            Size of the square mask (should be odd).
+            Size of the square mask
 
         Returns
         -------
         np.ndarray
-            The generated gradient mask.
+            Gradient mask
         """
         mask = np.zeros((size, size), dtype=np.uint8)
         center = size // 2
@@ -259,11 +557,15 @@ class Go2LidarLocalizationNode(Node):
             # Apply gradient mask
             mask_left = 50 - (x - left)
             mask_top = 50 - (y - top)
-            mask_roi = gradient_mask[mask_top:mask_top+(bottom-top+1),
-                                     mask_left:mask_left+(right-left+1)]
+            mask_roi = gradient_mask[
+                mask_top : mask_top + (bottom - top + 1),
+                mask_left : mask_left + (right - left + 1),
+            ]
 
-            region = self.map_temp[top:bottom+1, left:right+1]
-            self.map_temp[top:bottom+1, left:right+1] = np.maximum(region, mask_roi)
+            region = self.map_temp[top : bottom + 1, left : right + 1]
+            self.map_temp[top : bottom + 1, left : right + 1] = np.maximum(
+                region, mask_roi
+            )
 
     def check_convergence(self, x: float, y: float, yaw: float) -> bool:
         """
@@ -272,16 +574,16 @@ class Go2LidarLocalizationNode(Node):
         Parameters
         ----------
         x : float
-            Current x position in pixels.
+            Current x position
         y : float
-            Current y position in pixels.
+            Current y position
         yaw : float
-            Current yaw in radians.
+            Current yaw orientation
 
         Returns
         -------
         bool
-            True if converged, False otherwise.
+            True if converged, False otherwise
         """
         if x == 0 and y == 0 and yaw == 0:
             self.data_queue.clear()
@@ -313,22 +615,31 @@ class Go2LidarLocalizationNode(Node):
                 self.odom_frame,
                 self.base_frame,
                 rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.05)
+                timeout=rclpy.duration.Duration(seconds=0.05),
             )
 
             current_time = self.get_clock().now()
 
-            if self.last_velocity_pose is not None and self.last_velocity_check_time is not None:
+            if (
+                self.last_velocity_pose is not None
+                and self.last_velocity_check_time is not None
+            ):
                 dt = (current_time - self.last_velocity_check_time).nanoseconds / 1e9
 
                 if dt > 0:
-                    dx = current_transform.transform.translation.x - self.last_velocity_pose[0]
-                    dy = current_transform.transform.translation.y - self.last_velocity_pose[1]
+                    dx = (
+                        current_transform.transform.translation.x
+                        - self.last_velocity_pose[0]
+                    )
+                    dy = (
+                        current_transform.transform.translation.y
+                        - self.last_velocity_pose[1]
+                    )
                     self.current_velocity = hypot(dx, dy) / dt
 
             self.last_velocity_pose = (
                 current_transform.transform.translation.x,
-                current_transform.transform.translation.y
+                current_transform.transform.translation.y,
             )
             self.last_velocity_check_time = current_time
 
@@ -345,7 +656,7 @@ class Go2LidarLocalizationNode(Node):
                 self.odom_frame,
                 self.base_frame,
                 rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.05)
+                timeout=rclpy.duration.Duration(seconds=0.05),
             )
 
             if self.last_odom_pose is not None:
@@ -356,7 +667,9 @@ class Go2LidarLocalizationNode(Node):
                 # Get rotation delta
                 current_q = current_odom.transform.rotation
                 current_quat = [current_q.x, current_q.y, current_q.z, current_q.w]
-                _, _, current_yaw = tf_transformations.euler_from_quaternion(current_quat)
+                _, _, current_yaw = tf_transformations.euler_from_quaternion(
+                    current_quat
+                )
 
                 dyaw_odom = current_yaw - self.last_odom_pose[2]
 
@@ -372,8 +685,12 @@ class Go2LidarLocalizationNode(Node):
 
                 # Apply delta to scan matcher position
                 # Rotate delta by current orientation
-                self.lidar_x += dx_pixels * cos(-self.lidar_yaw) - dy_pixels * sin(-self.lidar_yaw)
-                self.lidar_y += dx_pixels * sin(-self.lidar_yaw) + dy_pixels * cos(-self.lidar_yaw)
+                self.lidar_x += dx_pixels * cos(-self.lidar_yaw) - dy_pixels * sin(
+                    -self.lidar_yaw
+                )
+                self.lidar_y += dx_pixels * sin(-self.lidar_yaw) + dy_pixels * cos(
+                    -self.lidar_yaw
+                )
                 self.lidar_yaw -= dyaw_odom
 
                 # Normalize yaw to [-pi, pi]
@@ -381,10 +698,6 @@ class Go2LidarLocalizationNode(Node):
                     self.lidar_yaw -= 2 * pi
                 while self.lidar_yaw < -pi:
                     self.lidar_yaw += 2 * pi
-
-                self.get_logger().debug(
-                    f'Odom prediction: dx={dx_pixels:.2f}, dy={dy_pixels:.2f}, dyaw={dyaw_odom:.3f}'
-                )
 
             # Store current pose for next iteration
             current_q = current_odom.transform.rotation
@@ -394,11 +707,11 @@ class Go2LidarLocalizationNode(Node):
             self.last_odom_pose = (
                 current_odom.transform.translation.x,
                 current_odom.transform.translation.y,
-                current_yaw
+                current_yaw,
             )
 
         except (TransformException, Exception) as e:
-            self.get_logger().debug(f'Odom prediction failed: {str(e)}')
+            self.get_logger().debug(f"Odom prediction failed: {str(e)}")
 
     def scan_callback(self, msg: LaserScan):
         """
@@ -406,14 +719,21 @@ class Go2LidarLocalizationNode(Node):
 
         Parameters
         ----------
-        msg : sensor_msgs.msg.LaserScan
-            The incoming laser scan message.
+        msg: LaserScan
+            Incoming laser scan message
         """
+        self.buffered_scan = msg
+
         # Check if map is available
         if self.map_msg is None or self.map_msg.info.resolution <= 0:
             return
 
         if self.map_cropped is None or self.map_temp is None:
+            return
+
+        # If not initialized, trigger global localization
+        if not self.is_initialized and self.enable_auto_init:
+            self.perform_global_localization(msg)
             return
 
         # Update velocity estimate
@@ -422,67 +742,26 @@ class Go2LidarLocalizationNode(Node):
         # Skip scan matching if moving too fast
         if self.current_velocity > self.velocity_threshold:
             self.get_logger().debug(
-                f'Skipping scan match - velocity too high: {self.current_velocity:.2f} m/s',
-                throttle_duration_sec=1.0
+                f"Skipping scan match - velocity too high: {self.current_velocity:.2f} m/s",
+                throttle_duration_sec=1.0,
             )
             return
 
         # Rate limit scan matching
         current_time = self.get_clock().now()
         if self.last_scan_match_time is not None:
-            time_since_last = (current_time - self.last_scan_match_time).nanoseconds / 1e9
+            time_since_last = (
+                current_time - self.last_scan_match_time
+            ).nanoseconds / 1e9
             if time_since_last < self.scan_match_interval:
                 return
         self.last_scan_match_time = current_time
 
-        self.scan_points = []
+        # Convert scan to points
+        self.scan_points = self.convert_scan_to_points(msg)
 
-        # Get transform from laser to base
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                self.base_frame,
-                self.laser_frame,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.1)
-            )
-        except (TransformException, Exception) as e:
-            self.get_logger().warn(f'TF lookup failed: {str(e)}', throttle_duration_sec=5.0)
+        if len(self.scan_points) == 0:
             return
-
-        # Check if lidar is inverted
-        q = transform.transform.rotation
-        quaternion = [q.x, q.y, q.z, q.w]
-        roll, pitch, yaw = tf_transformations.euler_from_quaternion(quaternion)
-
-        tolerance = 0.1
-        lidar_is_inverted = (abs(abs(roll) - pi) < tolerance) and not (abs(abs(pitch) - pi) < tolerance)
-
-        # Convert scan to points in base frame
-        angle = msg.angle_min
-        tx = transform.transform.translation.x
-        ty = transform.transform.translation.y
-
-        for _, r in enumerate(msg.ranges):
-            if msg.range_min <= r <= msg.range_max:
-                # Point in laser frame
-                x_laser = r * cos(angle)
-                y_laser = -r * sin(angle)
-
-                # Transform to base frame
-                x_base = x_laser * cos(yaw) - y_laser * sin(yaw) + tx
-                y_base = x_laser * sin(yaw) + y_laser * cos(yaw) + ty
-
-                # Convert to grid coordinates
-                x_grid = x_base / self.map_msg.info.resolution
-                y_grid = y_base / self.map_msg.info.resolution
-
-                if lidar_is_inverted:
-                    x_grid = -x_grid
-                    y_grid = -y_grid
-
-                self.scan_points.append((x_grid, y_grid))
-
-            angle += msg.angle_increment
 
         if self.scan_count == 0:
             self.scan_count += 1
@@ -490,7 +769,7 @@ class Go2LidarLocalizationNode(Node):
         # Predict pose using odometry before scan matching
         self.predict_pose_from_odometry()
 
-        # Perform scan matching with convergence loop
+        # Perform scan matching
         self.match_scan_iterative()
 
     def match_scan_iterative(self):
@@ -508,22 +787,43 @@ class Go2LidarLocalizationNode(Node):
             if iteration <= 3:
                 yaw_offsets = [
                     0,
-                    10*self.deg_to_rad, -10*self.deg_to_rad,
-                    30*self.deg_to_rad, -30*self.deg_to_rad,
-                    45*self.deg_to_rad, -45*self.deg_to_rad,
-                    90*self.deg_to_rad, -90*self.deg_to_rad,
-                    135*self.deg_to_rad, -135*self.deg_to_rad,
-                    180*self.deg_to_rad,
+                    10 * self.deg_to_rad,
+                    -10 * self.deg_to_rad,
+                    30 * self.deg_to_rad,
+                    -30 * self.deg_to_rad,
+                    45 * self.deg_to_rad,
+                    -45 * self.deg_to_rad,
+                    60 * self.deg_to_rad,
+                    -60 * self.deg_to_rad,
+                    75 * self.deg_to_rad,
+                    -75 * self.deg_to_rad,
+                    90 * self.deg_to_rad,
+                    -90 * self.deg_to_rad,
+                    105 * self.deg_to_rad,
+                    -105 * self.deg_to_rad,
+                    130 * self.deg_to_rad,
+                    -135 * self.deg_to_rad,
+                    145 * self.deg_to_rad,
+                    -145 * self.deg_to_rad,
+                    160 * self.deg_to_rad,
+                    -160 * self.deg_to_rad,
+                    180 * self.deg_to_rad,
                 ]
             else:
                 # Fine angular adjustment
                 yaw_offsets = [
                     0,
-                    2*self.deg_to_rad, -2*self.deg_to_rad,
-                    5*self.deg_to_rad, -5*self.deg_to_rad
+                    2 * self.deg_to_rad,
+                    -2 * self.deg_to_rad,
+                    5 * self.deg_to_rad,
+                    -5 * self.deg_to_rad,
                 ]
 
-            max_sum = 0
+            current_score = self.evaluate_pose(
+                self.lidar_x, self.lidar_y, self.lidar_yaw, self.scan_points
+            )
+
+            max_sum = current_score
             best_dx, best_dy, best_dyaw = 0, 0, 0
 
             for yaw_offset in yaw_offsets:
@@ -543,7 +843,10 @@ class Go2LidarLocalizationNode(Node):
                         px = int(tx + dx)
                         py = int(ty + dy)
 
-                        if 0 <= px < self.map_temp.shape[1] and 0 <= py < self.map_temp.shape[0]:
+                        if (
+                            0 <= px < self.map_temp.shape[1]
+                            and 0 <= py < self.map_temp.shape[0]
+                        ):
                             score += int(self.map_temp[py, px])
 
                     if score > max_sum:
@@ -552,12 +855,20 @@ class Go2LidarLocalizationNode(Node):
                         best_dy = dy
                         best_dyaw = yaw_offset
 
+            # If no improvement found, we've converged
+            if best_dx == 0 and best_dy == 0 and best_dyaw == 0:
+                self.get_logger().debug(
+                    f"Converged - no better pose found (score: {current_score})",
+                    throttle_duration_sec=1.0,
+                )
+                break
+
             # Reject bad matches
-            min_score_threshold = len(self.scan_points) * 30  # Adjust based on your environment
+            min_score_threshold = len(self.scan_points) * 30
             if max_sum < min_score_threshold:
                 self.get_logger().warn(
-                    f'Low match score: {max_sum} (threshold: {min_score_threshold}), rejecting update',
-                    throttle_duration_sec=1.0
+                    f"Low match score: {max_sum} (threshold: {min_score_threshold}), rejecting update",
+                    throttle_duration_sec=1.0,
                 )
                 break
 
@@ -570,6 +881,45 @@ class Go2LidarLocalizationNode(Node):
             if self.check_convergence(self.lidar_x, self.lidar_y, self.lidar_yaw):
                 break
 
+        # Store match quality
+        match_quality = max_sum / (len(self.scan_points) * 255)
+        self.last_match_quality = match_quality
+
+        # Publish localization pose
+        try:
+            map_to_base_transform = self.tf_buffer.lookup_transform(
+                "map",
+                self.base_frame,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.05),
+            )
+
+            msg = LocalizationPose()
+            msg.header = Header()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = "map"
+
+            msg.pose = Pose()
+            msg.pose.position.x = map_to_base_transform.transform.translation.x
+            msg.pose.position.y = map_to_base_transform.transform.translation.y
+            msg.pose.position.z = map_to_base_transform.transform.translation.z
+
+            msg.pose.orientation.x = map_to_base_transform.transform.rotation.x
+            msg.pose.orientation.y = map_to_base_transform.transform.rotation.y
+            msg.pose.orientation.z = map_to_base_transform.transform.rotation.z
+            msg.pose.orientation.w = map_to_base_transform.transform.rotation.w
+
+            msg.match_score = max_sum
+            msg.quality_percent = match_quality * 100.0
+            msg.num_points = len(self.scan_points)
+
+            self.localization_pose_pub.publish(msg)
+
+        except (TransformException, Exception) as e:
+            self.get_logger().debug(
+                f"Failed to get transform for pose message: {str(e)}"
+            )
+
     def pose_tf(self):
         """
         Publish map to odom transform
@@ -580,14 +930,21 @@ class Go2LidarLocalizationNode(Node):
         if self.map_msg is None or self.map_msg.info.resolution <= 0:
             return
 
-        # Convert from cropped map pixels to full map meters
-        full_map_pixel_x = self.lidar_x + self.map_roi_info['x_offset']
-        full_map_pixel_y = self.lidar_y + self.map_roi_info['y_offset']
+        if not self.is_initialized:
+            return
 
-        x_in_map = full_map_pixel_x * self.map_msg.info.resolution + \
-                   self.map_msg.info.origin.position.x
-        y_in_map = full_map_pixel_y * self.map_msg.info.resolution + \
-                   self.map_msg.info.origin.position.y
+        # Convert from cropped map pixels to full map meters
+        full_map_pixel_x = self.lidar_x + self.map_roi_info["x_offset"]
+        full_map_pixel_y = self.lidar_y + self.map_roi_info["y_offset"]
+
+        x_in_map = (
+            full_map_pixel_x * self.map_msg.info.resolution
+            + self.map_msg.info.origin.position.x
+        )
+        y_in_map = (
+            full_map_pixel_y * self.map_msg.info.resolution
+            + self.map_msg.info.origin.position.y
+        )
         yaw_in_map = -self.lidar_yaw
 
         # Get odom to base transform
@@ -596,7 +953,7 @@ class Go2LidarLocalizationNode(Node):
                 self.odom_frame,
                 self.base_frame,
                 rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.05)
+                timeout=rclpy.duration.Duration(seconds=0.05),
             )
         except (TransformException, Exception) as e:
             return
@@ -628,7 +985,7 @@ class Go2LidarLocalizationNode(Node):
         # Publish transform
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'map'
+        t.header.frame_id = "map"
         t.child_frame_id = self.odom_frame
 
         t.transform.translation.x = map_to_odom_trans[0]
@@ -656,5 +1013,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

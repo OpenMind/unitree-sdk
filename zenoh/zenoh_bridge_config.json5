@@ -74,6 +74,7 @@
 
                       // Navigation
                       ".*/amcl_pose",
+                      ".*/om/localization_pose",
                       ".*/plan",
                       ".*/plan_smoothed",
                       ".*/local_plan",
@@ -179,6 +180,7 @@
 
                       // Navigation
                       ".*/amcl_pose",
+                      ".*/om/localization_pose",
                       ".*/plan",
                       ".*/plan_smoothed",
                       ".*/local_plan",
@@ -252,6 +254,9 @@
           ".*/utlidar/mapping_cmd",
           ".*/utlidar/switch",
 
+          // Localization services
+          ".*/om/global_localization",
+
           // Other services
           ".*/joy/set_feedback",
           ".*/preempt_teleop",
@@ -296,6 +301,9 @@
           ".*/uslam/client_command",
           ".*/utlidar/mapping_cmd",
           ".*/utlidar/switch",
+
+          // Localization services
+          ".*/om/global_localization",
 
           // Other services
           ".*/joy/set_feedback",

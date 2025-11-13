@@ -29,6 +29,10 @@ setup(
         ('share/' + package_name + '/meshes', [
             os.path.join('meshes', f) for f in os.listdir('meshes') if f.endswith('.STL')
         ]),
+        # Maps directory for RTAB-Map database storage
+        ('share/' + package_name + '/maps', [
+            os.path.join('maps', f) for f in os.listdir('maps') if os.path.isfile(os.path.join('maps', f))
+        ] if os.path.exists('maps') else []),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

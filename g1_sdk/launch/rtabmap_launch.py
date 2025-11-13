@@ -13,9 +13,13 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
+    database_path = LaunchConfiguration('database_path')
     
     # Get package directories
     g1_pkg_dir = get_package_share_directory('g1_sdk')
+    
+    # Default database path in package maps folder
+    default_db_path = os.path.join(g1_pkg_dir, 'maps', 'rtabmap.db')
     
     # RTAB-Map parameters
     parameters = [{
@@ -32,6 +36,7 @@ def generate_launch_description():
         'qos_image': qos,
         'qos_scan': qos,
         'qos_odom': qos,
+        'database_path': database_path,  # ADDED: This is the critical line
         
         # RTAB-Map parameters
         'Rtabmap/DetectionRate': '1.0',
@@ -117,7 +122,7 @@ def generate_launch_description():
         
         DeclareLaunchArgument(
             'database_path',
-            default_value='~/.ros/rtabmap.db',
+            default_value=default_db_path,
             description='Path to RTAB-Map database'
         ),
         

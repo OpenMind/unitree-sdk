@@ -280,7 +280,6 @@ class OMPath(Node):
 
         for x, y, _ in zip(X, Y, D):
             for idx in range(N):
-                # 后退（idx=9）只看后侧
                 if idx == 9 and x >= 0.0:
                     continue
                 if blocked_by_obstacle[idx]:

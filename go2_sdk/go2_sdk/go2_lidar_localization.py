@@ -964,7 +964,6 @@ class Go2LidarLocalizationNode(Node):
         except (TransformException, Exception) as e:
             return
 
-        # Build transform matrices using numpy for more accurate calculation
         # Map to base transform
         map_to_base = tf_transformations.quaternion_matrix(
             tf_transformations.quaternion_from_euler(0, 0, yaw_in_map)

@@ -31,7 +31,6 @@ class Go2LidarLocalizationNode(Node):
         self.declare_parameter(
             "global_localization_particles", 10000
         )  # Number of random samples
-        self.declare_parameter("enable_auto_init", True)  # Auto-initialize on startup
 
         # Get parameters
         self.base_frame = self.get_parameter("base_frame").value
@@ -41,7 +40,6 @@ class Go2LidarLocalizationNode(Node):
         self.velocity_threshold = self.get_parameter("velocity_threshold").value
         self.scan_match_interval = self.get_parameter("scan_match_interval").value
         self.n_particles = self.get_parameter("global_localization_particles").value
-        self.enable_auto_init = self.get_parameter("enable_auto_init").value
 
         # Initialize variables
         self.map_msg = None
@@ -111,6 +109,9 @@ class Go2LidarLocalizationNode(Node):
 
         # Timer for publishing TF at 30Hz
         self.tf_timer = self.create_timer(1.0 / 30.0, self.pose_tf)
+
+        # Pose estimated flag
+        self.is_pose_estimated = False
 
         self.get_logger().info("Lidar localization node initialized")
         self.get_logger().info(f"Velocity threshold: {self.velocity_threshold} m/s")
@@ -650,6 +651,11 @@ class Go2LidarLocalizationNode(Node):
         """
         Use odometry to predict where robot moved since last update
         """
+        # Avoid the pose prediction on the global localization first run
+        if self.is_pose_estimated == False:
+            self.is_pose_estimated = True
+            return
+
         try:
             # Get current odometry
             current_odom = self.tf_buffer.lookup_transform(
@@ -732,7 +738,7 @@ class Go2LidarLocalizationNode(Node):
             return
 
         # If not initialized, trigger global localization
-        if not self.is_initialized and self.enable_auto_init:
+        if not self.is_initialized:
             self.perform_global_localization(msg)
             return
 

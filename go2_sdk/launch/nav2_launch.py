@@ -29,10 +29,12 @@ def generate_launch_description():
         default=EnvironmentVariable("LIDAR_SERIAL_BAUDRATE", default_value="115200"),
     )
     frame_id = LaunchConfiguration(
-        "frame_id", default=EnvironmentVariable("LIDAR_FRAME_ID", default_value="laser")
+        "frame_id",
+        default=EnvironmentVariable("LIDAR_FRAME_ID", default_value="laser"),
     )
     inverted = LaunchConfiguration(
-        "inverted", default=EnvironmentVariable("LIDAR_INVERTED", default_value="false")
+        "inverted",
+        default=EnvironmentVariable("LIDAR_INVERTED", default_value="false"),
     )
     angle_compensate = LaunchConfiguration(
         "angle_compensate",
@@ -42,11 +44,15 @@ def generate_launch_description():
         "scan_mode",
         default=EnvironmentVariable("LIDAR_SCAN_MODE", default_value="Sensitivity"),
     )
-    use_nav2 = LaunchConfiguration(
-        "use_nav2", default=EnvironmentVariable("USE_NAV2", default_value="true")
-    )
     map_yaml_file = LaunchConfiguration(
-        "map_yaml_file", default=EnvironmentVariable("MAP_YAML_FILE", default_value="")
+        "map_yaml_file",
+        default=EnvironmentVariable("MAP_YAML_FILE", default_value=""),
+    )
+    global_localization_particles = LaunchConfiguration(
+        "global_localization_particles",
+        default=EnvironmentVariable(
+            "GLOBAL_LOCALIZATION_PARTICLES", default_value="10000"
+        ),
     )
 
     return LaunchDescription(
@@ -87,13 +93,13 @@ def generate_launch_description():
                 description="Specifying scan mode of lidar",
             ),
             DeclareLaunchArgument(
-                "use_nav2",
-                default_value=use_nav2,
-                description="Whether to launch Nav2 navigation stack",
-            ),
-            DeclareLaunchArgument(
                 "map_yaml_file",
                 description="Full path to map yaml file (leave empty for SLAM mode)",
+            ),
+            DeclareLaunchArgument(
+                "global_localization_particles",
+                default_value=global_localization_particles,
+                description="Number of particles for global localization",
             ),
             Node(
                 package="robot_state_publisher",
@@ -317,6 +323,7 @@ def generate_launch_description():
                         "odom_frame": "odom",
                         "laser_frame": "laser",
                         "laser_topic": "scan",
+                        "global_localization_particles": global_localization_particles,
                     }
                 ],
             ),

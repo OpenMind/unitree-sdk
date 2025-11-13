@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/OMAIRequest.msg"
   "msg/OMAIReponse.msg"
   "msg/OMASRText.msg"
+  "msg/OMAvatarFace.msg"
   "msg/OMModeRequest.msg"
   "msg/OMModeReponse.msg"
   "msg/OMTTSRequest.msg"

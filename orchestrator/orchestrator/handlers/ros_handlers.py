@@ -12,9 +12,10 @@ from om_api.msg import (
     OMAIRequest,
     OMAPIRequest,
     OMAPIResponse,
-    OMASRText,
     OMModeRequest,
     OMTTSRequest,
+    OMASRText,
+    OMAvatarFace,
 )
 
 if TYPE_CHECKING:
@@ -579,13 +580,13 @@ class ROSHandlers:
         }
         self.orchestrator.cloud_connection_manager.send_map_data(map_data)
 
-    def asr_text_callback(self, msg):
+    def asr_text_callback(self, msg: OMASRText):
         """
         Callback function for ASR text messages to broadcast to frontend.
 
         Parameters:
         -----------
-        msg : om_api.msg.OMASRText
+        msg : OMASRText
             The incoming ASR text message.
         """
         if not hasattr(self.orchestrator, "cloud_connection_manager"):
@@ -612,6 +613,41 @@ class ROSHandlers:
             except Exception as e:
                 self.orchestrator.get_logger().error(
                     f"Failed to broadcast ASR text: {e}"
+                )
+
+    def avatar_face_callback(self, msg: OMAvatarFace):
+        """
+        Callback function for avatar face messages to broadcast to frontend.
+
+        Parameters:
+        -----------
+        msg : OMAvatarFace
+            The incoming avatar face message.
+        """
+        if not hasattr(self.orchestrator, "cloud_connection_manager"):
+            self.orchestrator.get_logger().warning(
+                "Cloud connection manager not available"
+            )
+            return
+
+        # Broadcast avatar face to WebSocket clients
+        avatar_face_data = {
+            "type": "avatar",
+            "face": msg.face_text,
+            "timestamp": msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
+        }
+
+        if self.orchestrator.cloud_connection_manager.local_api_ws:
+            try:
+                self.orchestrator.cloud_connection_manager.local_api_ws.broadcast(
+                    json.dumps(avatar_face_data)
+                )
+                self.orchestrator.get_logger().info(
+                    f"Broadcasted avatar face to frontend: {msg.face_text}"
+                )
+            except Exception as e:
+                self.orchestrator.get_logger().error(
+                    f"Failed to broadcast avatar face: {e}"
                 )
 
     def cloud_api_response_callback(self, response):

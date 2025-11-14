@@ -22,7 +22,6 @@ from sensor_msgs_py import point_cloud2 as pc2
 from std_msgs.msg import Header
 
 
-# ---------------- TF / math helpers ----------------
 def tf_to_matrix(tf):
     """Convert a ROS2 TransformStamped into a 4x4 homogeneous transform matrix.
 
@@ -164,8 +163,7 @@ class LocalTraversability(Node):
         self.min_hazard_blob_side_m = 0.30  # 30 cm x 30 cm blob minimum
 
         # Hazard inflation radius: extra safety margin around hazards
-        self.hazard_inflation_radius_m = 0.0  # 0.0 => no inflation
-
+        self.hazard_inflation_radius_m = 0.0
         # Hazard outputs
         self.hazard_points_topic = "/traversability/hazard_points"
         self.hazard_points_frame = (
@@ -177,7 +175,6 @@ class LocalTraversability(Node):
         self.hazard_thinning_stride = 1  # 1 => keep every cell, >1 => sub-sample
         self.hazard_points_topic_pc2 = "/traversability/hazard_points2"
 
-        # ===== TF & ROS handles =====
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
@@ -214,7 +211,6 @@ class LocalTraversability(Node):
             f"({self.hazard_points_frame})"
         )
 
-    # ---------------- helper publishers ----------------
     def _publish_hazard_cloud2(self, xyz: np.ndarray, frame_id: str) -> None:
         """Publish a PointCloud2 of hazard cell centers.
 
@@ -231,7 +227,6 @@ class LocalTraversability(Node):
         msg = pc2.create_cloud_xyz32(header, xyz.tolist())
         self.hazard_pub_pc2.publish(msg)
 
-    # -------------- input callback --------------
     def pc2_call_back(self, msg: PointCloud2) -> None:
         """Callback for incoming depth PointCloud2.
 
@@ -256,7 +251,6 @@ class LocalTraversability(Node):
             return
         self._run_pipeline(pts, src_frame)
 
-    # -------------- main processing pipeline --------------
     def _run_pipeline(self, pts_src: np.ndarray, src_frame: str) -> None:
         """Full traversability computation pipeline.
 
@@ -280,7 +274,7 @@ class LocalTraversability(Node):
         src_frame : str
             Name of the TF frame for the input cloud.
         """
-        # ----- 1) Transform cloud into map_frame (e.g. 'odom') -----
+
         try:
             tf_cloud = self.tf_buffer.lookup_transform(
                 self.map_frame, src_frame, Time()
@@ -293,7 +287,6 @@ class LocalTraversability(Node):
         pts_h = np.hstack([pts_src, np.ones((pts_src.shape[0], 1), dtype=np.float32)])
         pts_t = (T_cloud @ pts_h.T).T[:, :3]  # points in map_frame
 
-        # ----- 2) Get base_link pose in map_frame (position + yaw) -----
         try:
             tf_bl = self.tf_buffer.lookup_transform(self.map_frame, "base_link", Time())
             bl_t = tf_bl.transform.translation
@@ -307,7 +300,6 @@ class LocalTraversability(Node):
             bl_y = 0.0
             yaw = 0.0
 
-        # ----- Build ROI in robot-centric coordinates (x forward, y left) -----
         x_world, y_world, z_world = pts_t[:, 0], pts_t[:, 1], pts_t[:, 2]
 
         # World -> robot frame: translate so robot is at origin, then rotate by -yaw
@@ -375,7 +367,7 @@ class LocalTraversability(Node):
         known_mask = ~np.isnan(height_map)
         unknown_mask = np.isnan(height_map)
 
-        # ----- 7) Gradients / slope on the height map -----
+        # Gradients / slope on the height map
         dz_dx = np.full_like(height_map, np.nan, dtype=np.float32)
         dz_dy = np.full_like(height_map, np.nan, dtype=np.float32)
         K = max(1, int(self.slope_baseline_cells))
@@ -422,7 +414,7 @@ class LocalTraversability(Node):
 
         # Unknown hazards: "cliff" style using rays + left/right known neighbors -----
 
-        # 9.1 Compute cell centers in map_frame, then to robot frame
+        # Compute cell centers in map_frame, then to robot frame
         xs = origin_x + (np.arange(grid_width, dtype=np.float32) + 0.5) * res
         ys = origin_y + (np.arange(grid_height, dtype=np.float32) + 0.5) * res
         Xg, Yg = np.meshgrid(xs, ys)  # grid cell centers in map_frame
@@ -474,7 +466,7 @@ class LocalTraversability(Node):
 
         unknown_candidate = unknown_candidate_flat.reshape(grid_height, grid_width)
 
-        # 9.3: require both left and right neighbors (in angle space) to have known cells
+        # require both left and right neighbors (in angle space) to have known cells
         mask_known_front = front_flat & known_flat
         R_known = R_flat[mask_known_front]
         theta_known_idx = theta_idx_flat[mask_known_front]
@@ -513,10 +505,10 @@ class LocalTraversability(Node):
 
         unknown_hazard = unknown_haz_flat.reshape(grid_height, grid_width)
 
-        # ----- ombine hazards from all sources -----
+        # ombine hazards from all sources
         hazard = step_hazard | haz_slope_down | haz_slope_mag | unknown_hazard
 
-        # ----- De-speckle: keep only blobs with area >= (min_hazard_blob_side_m)^2 -----
+        # De-speckle: keep only blobs with area >= (min_hazard_blob_side_m)^2
         structure = np.ones((3, 3), dtype=bool)  # 8-connected components
         lbl, num = label(hazard, structure=structure)
         if num > 0:
@@ -529,13 +521,13 @@ class LocalTraversability(Node):
         else:
             hazard = np.zeros_like(hazard, dtype=bool)
 
-        # ----- Optional dilation around hazard blobs (currently zero radius => no-op) -----
+        # Optional dilation around hazard blobs (currently zero radius => no-op)
         inflate_cells = max(0, int(round(self.hazard_inflation_radius_m / res)))
         if inflate_cells > 0:
             se = np.ones((2 * inflate_cells + 1, 2 * inflate_cells + 1), dtype=bool)
             hazard = binary_dilation(hazard, structure=se)
 
-        # ----- Build OccupancyGrid (-1 unknown, 0 free, 100 hazard/occupied) -----
+        # Build OccupancyGrid (-1 unknown, 0 free, 100 hazard/occupied)
         occ = np.full((grid_height, grid_width), -1, dtype=np.int8)
         free_mask = (~hazard) & (~np.isnan(height_map))
         occ[free_mask] = 0
@@ -556,7 +548,7 @@ class LocalTraversability(Node):
         grid.data = occ.flatten(order="C").tolist()
         self.grid_pub.publish(grid)
 
-        # ----- 14) Hazard point clouds (for om_path) -----
+        # Hazard point clouds (for om_path)
         haz_mask = np.array(hazard, dtype=bool)
         if self.hazard_include_unknown:
             haz_mask |= occ < 0

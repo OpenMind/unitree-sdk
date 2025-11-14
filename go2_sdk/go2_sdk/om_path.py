@@ -21,33 +21,21 @@ from om_api.msg import Paths
 
 
 def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=10):
-    """Create a straight line path from origin at specified angle and length.
-
-    Parameters
-    ----------
-    angle_degrees : float
-        Heading in degrees; here 0° ≡ +X forward, +Y left (robot frame).
-    length : float
-        Path length in meters.
-    num_points : int
-        Number of samples along the path.
-
-    Returns
-    -------
-    np.ndarray
-        Shape (2, num_points) with x row then y row.
-    """
+    """Create a straight line path from origin at specified angle and length"""
     a = math.radians(angle_degrees)
     end_x = length * math.cos(a)  # +X forward
     end_y = length * math.sin(a)  # +Y left
+
     x_vals = np.linspace(0.0, end_x, num_points)
     y_vals = np.linspace(0.0, end_y, num_points)
     return np.array([x_vals, y_vals])
 
 
-# Define 9 straight line paths separated by 15 degrees (+ one reverse at 180°)
+# Define 9 straight line paths separated by 15 degrees
+# Center path is 0° (straight forward), then ±15°, ±30°, ±45°, ±60°
 path_angles = [-60, -45, -30, -15, 0, 15, 30, 45, 60, 180]  # degrees
 path_length = 1.05  # meters
+
 paths = [create_straight_line_path_from_angle(a, path_length) for a in path_angles]
 
 
@@ -64,25 +52,16 @@ class OMPath(Node):
     def __init__(self):
         super().__init__("om_path")
 
-        # === old-style member variables (no params except hazard topic) ===
         self.half_width_robot = 0.20
-        self.sensor_mounting_angle = 172.0  # deg, +CCW sensor->robot
+        self.sensor_mounting_angle = 172.0
         self.relevant_distance_min = 0.20
-        self.obstacle_threshold = 0.50  # min #points to consider depth cloud
-        self.laser_frame = "laser"  # keep consistent frame used for publishing
+        self.obstacle_threshold = 0.50  # 50 data points
+        self.laser_frame = "laser"
 
-        # Only this topic remains parameterized (compatibility with your CLI)
-        self.declare_parameter("hazard_topic_pc2", "/traversability/hazard_points2")
-        self.hazard_topic_pc2 = (
-            self.get_parameter("hazard_topic_pc2").get_parameter_value().string_value
-        )
-
-        # State like the old file
         self.scan = None
         self.obstacle: PointCloud | None = None
         self.hazard_xy_robot = np.zeros((0, 2), dtype=np.float32)
 
-        # Subscriptions (names/shape like old file)
         self.scan_info = self.create_subscription(
             LaserScan, "/scan", self.scan_callback, 10
         )
@@ -93,51 +72,61 @@ class OMPath(Node):
             10,
         )
         self.hazard_info = self.create_subscription(
-            PointCloud2, self.hazard_topic_pc2, self.hazard_callback_pc2, 10
+            PointCloud2, "/traversability/hazard_points2", self.hazard_callback_pc2, 10
         )
 
-        # Publisher identical to old file
         self.paths_pub = self.create_publisher(Paths, "/om/paths", 10)
         self.markers_pub = self.create_publisher(MarkerArray, "/om/paths_markers", 10)
 
         self.get_logger().info("OMPath node started (with hazard PC2 support)")
 
     def scan_callback(self, msg: LaserScan):
-        """Main fuse/select logic presented in the old style (same names/flow)."""
         self.scan = msg
 
-        # Keep angles in radians, do not flip, add mounting in radians
         angles = list(
-            np.arange(
-                self.scan.angle_min, self.scan.angle_max, self.scan.angle_increment
+            map(
+                lambda x: 360.0 * (x + math.pi) / (2 * math.pi) - 180.0,
+                np.arange(
+                    self.scan.angle_min,
+                    self.scan.angle_max,
+                    self.scan.angle_increment,
+                ),
             )
         )
         angles_final = angles
+        # angles now run from 360.0 to 0 degress
         data = list(zip(angles_final, self.scan.ranges))
 
         complexes = []
-        mount = math.radians(self.sensor_mounting_angle)
 
-        for angle_rad, d_m in data:
+        for angle, distance in data:
+            d_m = distance
+
+            # v2-style filtering (keep exactly this!)
             if not math.isfinite(d_m) or d_m > 5.0 or d_m < self.relevant_distance_min:
                 continue
 
-            # sensor -> robot
-            theta = angle_rad + mount
+            # first, correctly orient the sensor zero to the robot zero
+            angle = angle + self.sensor_mounting_angle
 
-            # robot frame: x = d*cos, y = d*sin  (0° = +X forward, +Y left)
-            x = d_m * math.cos(theta)
-            y = d_m * math.sin(theta)
+            if angle >= 360.0:
+                angle = angle - 360.0
+            elif angle < 0.0:
+                angle = 360.0 + angle
 
-            # angle for sorting/compatibility: [-180, 180)
-            a_deg = ((math.degrees(theta) + 180.0) % 360.0) - 180.0
+            # then, convert to radians
+            a_rad = angle * math.pi / 180.0
 
-            complexes.append([x, y, a_deg, d_m])
+            x = d_m * math.cos(a_rad)
+            y = d_m * math.sin(a_rad)
 
-        # Depth obstacles (already in robot frame)
+            # the final data ready to use for path planning
+            complexes.append([x, y, angle, d_m])
+
         if self.obstacle and len(self.obstacle.points) > self.obstacle_threshold:
             for p in self.obstacle.points:
-                x, y = float(p.x), float(p.y)
+                x = float(p.x)
+                y = float(p.y)
                 angle, distance = self.calculate_angle_and_distance(x, y)
                 complexes.append([x, y, angle, distance])
 
@@ -153,33 +142,42 @@ class OMPath(Node):
         D = array[:, 3]
 
         N = len(path_angles)
-        possible_paths = np.arange(0, N)  # 0..9
-        bad_paths = []  # kept for compatibility/inspection
-
-        # NEW: record blocked path indices instead of boolean arrays
+        possible_paths = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        bad_paths = []
         blocked_by_obstacle_set = set()
         blocked_by_hazard_set = set()
 
-        # Obstacle-based blocking
         for x, y, d in list(zip(X, Y, D)):
             for apath in possible_paths.copy():
-                # Reverse ray only considers obstacles behind robot
-                if apath == 9 and x >= 0.0:
-                    continue
+                # For going back, only consider obstacles that are:
+                # 1. Behind the robot (negative x in robot frame)
+                # 2. Within a certain distance threshold
 
+                # Assuming robot faces positive x direction
+                # Only check obstacles behind the robot
+                if (
+                    apath == 9 and x >= 0.0
+                ):  # Skip obstacles in front of or beside the robot
+                    continue
+                # Get the start and end points of this straight line path
                 path_points = paths[apath]
                 start_x, start_y = path_points[0][0], path_points[1][0]
                 end_x, end_y = path_points[0][-1], path_points[1][-1]
+                # Calculate distance from obstacle to the line segment
                 dist_to_line = self.distance_point_to_line_segment(
                     x, y, start_x, start_y, end_x, end_y
                 )
                 if dist_to_line < self.half_width_robot:
+                    # too close - this path will not work
+                    path_to_remove = np.array([apath])
                     bad_paths.append(apath)
                     blocked_by_obstacle_set.add(int(apath))
-                    possible_paths = np.setdiff1d(possible_paths, np.array([apath]))
+                    # Remove this path from the possible paths
+                    # np.setdiff1d returns a new array, so we need to update possible_paths
+                    possible_paths = np.setdiff1d(possible_paths, path_to_remove)
                     break
 
-        # Hazard-based blocking: only forward rays (0..8)
+        # Hazard-based blocking (unchanged v2 logic)
         if self.hazard_xy_robot.size > 0 and possible_paths.size > 0:
             for hx, hy in self.hazard_xy_robot:
                 for apath in possible_paths.copy():
@@ -192,22 +190,20 @@ class OMPath(Node):
                         hx, hy, start_x, start_y, end_x, end_y
                     )
                     if dist_to_line < self.half_width_robot:
+                        path_to_remove = np.array([apath])
                         bad_paths.append(apath)
                         blocked_by_hazard_set.add(int(apath))
-                        possible_paths = np.setdiff1d(possible_paths, np.array([apath]))
+                        possible_paths = np.setdiff1d(possible_paths, path_to_remove)
                         break
 
-        # Convert sets to sorted index lists
         blocked_by_obstacle_idx = [int(i) for i in sorted(blocked_by_obstacle_set)]
         blocked_by_hazard_idx = [int(i) for i in sorted(blocked_by_hazard_set)]
 
-        # Publish (same shape) + optional index lists for clarity
         paths_msg = Paths()
         paths_msg.header.stamp = self.get_clock().now().to_msg()
         paths_msg.header.frame_id = self.laser_frame
-        paths_msg.paths = [int(i) for i in possible_paths.tolist()]
+        paths_msg.paths = possible_paths.tolist()
 
-        # Prefer index-style fields if your msg supports them
         if hasattr(paths_msg, "blocked_by_obstacle_idx"):
             paths_msg.blocked_by_obstacle_idx = blocked_by_obstacle_idx
         if hasattr(paths_msg, "blocked_by_hazard_idx"):
@@ -215,7 +211,6 @@ class OMPath(Node):
 
         self.paths_pub.publish(paths_msg)
 
-        # RViz markers (display uses -mounting angle)
         bad_union = blocked_by_obstacle_set | blocked_by_hazard_set
         self._publish_markers(
             possible_paths=set(paths_msg.paths),
@@ -260,17 +255,27 @@ class OMPath(Node):
 
     def distance_point_to_line_segment(self, px, py, x1, y1, x2, y2):
         """Distance from (px,py) to segment (x1,y1)-(x2,y2)."""
+        # Vector from line start to line end
         dx = x2 - x1
         dy = y2 - y1
+
+        # If the line segment has zero length, return distance to point
         if dx == 0 and dy == 0:
             return math.sqrt((px - x1) ** 2 + (py - y1) ** 2)
+
+        # Calculate the parameter t that represents the projection of the point onto the line
         t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+
+        # Clamp t to [0, 1] to stay within the line segment
         t = max(0, min(1, t))
+
+        # Find the closest point on the line segment
         closest_x = x1 + t * dx
         closest_y = y1 + t * dy
+
+        # Return the distance from the point to the closest point on the line segment
         return math.sqrt((px - closest_x) ** 2 + (py - closest_y) ** 2)
 
-    # ---------- marker publishing ----------
     def _publish_markers(
         self, possible_paths, bad_paths, obstacles_xy, hazards_xy, frame_id, stamp
     ):

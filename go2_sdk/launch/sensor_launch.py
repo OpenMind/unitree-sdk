@@ -190,6 +190,14 @@ def generate_launch_description():
             ),
             Node(
                 package="go2_sdk",
+                executable="local_traversability_node",
+                name="local_traversability_node",
+                output="screen",
+                respawn=True,
+                respawn_delay=2.0,
+            ),
+            Node(
+                package="go2_sdk",
                 executable="go2_camera_stream",
                 name="go2_camera_stream",
                 output="screen",

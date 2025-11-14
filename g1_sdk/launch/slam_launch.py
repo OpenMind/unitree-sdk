@@ -241,6 +241,12 @@ def generate_launch_description():
             output='screen',
         ),
         Node(
+            package='g1_sdk',
+            executable='waypoint_manager',
+            name='waypoint_manager',
+            output='screen',
+        ),
+        Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',

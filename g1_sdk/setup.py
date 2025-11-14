@@ -42,10 +42,10 @@ setup(
         'console_scripts': [
             'cmd_vel_to_g1 = g1_sdk.g1_teleop:main',
             'g1_loco_action = g1_sdk.g1_loco_action:main',
-            'pose_to_tf = g1_sdk.pose_to_tf:main',
             'g1_odom = g1_sdk.g1_odom:main',
             'g1_jointstate = g1_sdk.g1_jointstate:main',
             'g1_nav2_api = g1_sdk.g1_nav2_api:main',
+            'waypoint_manager = g1_sdk.waypoint_manager:main',
         ],
     },
 )

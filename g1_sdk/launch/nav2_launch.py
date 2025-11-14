@@ -116,6 +116,12 @@ def generate_launch_description():
             name='g1_nav2_api',
             output='screen',
         ),
+        Node(
+            package='g1_sdk',
+            executable='waypoint_manager',
+            name='waypoint_manager',
+            output='screen',
+        ),
     ]
 
     return LaunchDescription([

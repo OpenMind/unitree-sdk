@@ -39,13 +39,8 @@ class ProcessManager:
             True if the process was started successfully, False if a process is already running.
         """
         if self.process is None or self.process.poll() is not None:
-            package = 'g1_sdk' if self.robot_type == 'G1' else 'go2_sdk'
-            cmd = [
-                'ros2',
-                'launch',
-                package,
-                launch_file
-            ]
+            package = "g1_sdk" if self.robot_type == "G1" else "go2_sdk"
+            cmd = ["ros2", "launch", package, launch_file]
             if map_yaml:
                 cmd.extend(["map_yaml_file:=" + map_yaml])
             self.process = subprocess.Popen(cmd, preexec_fn=os.setsid)

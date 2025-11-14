@@ -1,14 +1,18 @@
+import json
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
+
 from unitree_api.msg import Request, RequestHeader, RequestIdentity
-import json
+
 
 class G1LocoAction(Node):
     """
     A ROS2 node that interfaces with the G1 locomotion action system.
     Provides joystick control for G1 humanoid robot actions.
     """
+
     def __init__(self):
         super().__init__("g1_loco_action_node")
 
@@ -16,7 +20,7 @@ class G1LocoAction(Node):
         self.ROBOT_API_ID_LOCO_SET_FSM_ID = 7101
         self.ROBOT_API_ID_LOCO_SET_BALANCE_MODE = 7102
         self.ROBOT_API_ID_LOCO_SET_ARM_TASK = 7106
-        
+
         # G1 FSM States (from official SDK)
         self.FSM_ID_ZERO_TORQUE = 0
         self.FSM_ID_DAMP = 1
@@ -25,11 +29,11 @@ class G1LocoAction(Node):
         self.FSM_ID_SQUAT2STANDUP = 706
         self.FSM_ID_STANDUP2SQUAT = 706  # Same as squat2standup
         self.FSM_ID_LIE2STANDUP = 702
-        
+
         # G1 Balance Modes
         self.BALANCE_MODE_NORMAL = 0
         self.BALANCE_MODE_CONTINUOUS = 1
-        
+
         # G1 Arm Tasks (from official SDK)
         self.ARM_TASK_WAVE_HAND = 0
         self.ARM_TASK_WAVE_HAND_TURN = 1
@@ -37,22 +41,15 @@ class G1LocoAction(Node):
         self.ARM_TASK_SHAKE_HAND_2 = 3
 
         self.joy_subscription = self.create_subscription(
-            Joy,
-            "/joy",
-            self.joy_callback,
-            10
+            Joy, "/joy", self.joy_callback, 10
         )
 
-        self.loco_publisher = self.create_publisher(
-            Request,
-            "/api/sport/request",
-            10
-        )
+        self.loco_publisher = self.create_publisher(Request, "/api/sport/request", 10)
 
         self.get_logger().info("G1 Loco Action Node initialized")
         self.get_logger().info("Joystick controls:")
         self.get_logger().info("  Button 0 (A): Squat2StandUp")
-        self.get_logger().info("  Button 1 (B): Sit Down") 
+        self.get_logger().info("  Button 1 (B): Sit Down")
         self.get_logger().info("  Button 2 (X): Damp Mode")
         self.get_logger().info("  Button 3 (Y): Balance Stand")
         self.get_logger().info("  Button 4 (LB): Wave Hand")
@@ -116,11 +113,9 @@ class G1LocoAction(Node):
         request_msg.header.identity = RequestIdentity()
         request_msg.header.identity.api_id = self.ROBOT_API_ID_LOCO_SET_FSM_ID
 
-        fsm_params = {
-            "data": fsm_id
-        }
+        fsm_params = {"data": fsm_id}
         request_msg.parameter = json.dumps(fsm_params)
-        
+
         self.loco_publisher.publish(request_msg)
         self.get_logger().debug(f"Sent FSM command with ID: {fsm_id}")
 
@@ -138,11 +133,9 @@ class G1LocoAction(Node):
         request_msg.header.identity = RequestIdentity()
         request_msg.header.identity.api_id = self.ROBOT_API_ID_LOCO_SET_BALANCE_MODE
 
-        balance_params = {
-            "data": balance_mode
-        }
+        balance_params = {"data": balance_mode}
         request_msg.parameter = json.dumps(balance_params)
-        
+
         self.loco_publisher.publish(request_msg)
         self.get_logger().debug(f"Sent balance mode command: {balance_mode}")
 
@@ -160,32 +153,32 @@ class G1LocoAction(Node):
         request_msg.header.identity = RequestIdentity()
         request_msg.header.identity.api_id = self.ROBOT_API_ID_LOCO_SET_ARM_TASK
 
-        arm_params = {
-            "data": task_id
-        }
+        arm_params = {"data": task_id}
         request_msg.parameter = json.dumps(arm_params)
-        
+
         self.loco_publisher.publish(request_msg)
         self.get_logger().debug(f"Sent arm task command: {task_id}")
+
 
 def main(args=None):
     rclpy.init(args=args)
 
     try:
         node = G1LocoAction()
-        
+
         # Initialize G1 to ready state
         node.get_logger().info("Initializing G1 to start state...")
         node.send_fsm_command(node.FSM_ID_START)
         node.get_logger().info(f"Sent FSM_ID_START = {node.FSM_ID_START}")
-        
+
         rclpy.spin(node)
     except Exception as e:
         print(f"G1LocoAction encountered an error: {e}")
     finally:
-        if 'node' in locals():
+        if "node" in locals():
             node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

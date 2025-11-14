@@ -34,7 +34,6 @@ class OrchestratorAPI(Node):
     various components of the robot system.
     """
 
-
     def __init__(self):
         super().__init__("orchestrator_api")
 
@@ -42,14 +41,16 @@ class OrchestratorAPI(Node):
         self.locations_directory = os.path.abspath("./locations")
 
         # Set robot_type from environment variable, default to 'Go2' if not set
-        self.robot_type = os.environ.get('ROBOT_TYPE', 'Go2')
+        self.robot_type = os.environ.get("ROBOT_TYPE", "Go2")
         self.get_logger().info(f"Robot type set from environment: {self.robot_type}")
 
         self.base_control_manager = ProcessManager(self.robot_type)
         self.slam_manager = ProcessManager(self.robot_type)
         self.nav2_manager = ProcessManager(self.robot_type)
 
-        self.map_manager = MapManager(self.maps_directory, self.robot_type, self.get_logger())
+        self.map_manager = MapManager(
+            self.maps_directory, self.robot_type, self.get_logger()
+        )
         self.location_manager = LocationManager(
             self.maps_directory, self.locations_directory, self.get_logger()
         )
@@ -67,8 +68,6 @@ class OrchestratorAPI(Node):
         self.flask_service.register_routes(self.api_handlers)
         self.flask_service.start()
         self.get_logger().info("Orchestrator API Node has been started.")
-
-
 
     def _setup_ros_publishers(self):
         """
@@ -202,6 +201,7 @@ class OrchestratorAPI(Node):
         map_storage_msg.base_path = base_path
 
         self.map_saver_pub.publish(map_storage_msg)
+
 
 def main(args=None):
     """

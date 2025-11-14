@@ -62,47 +62,53 @@ class MapManager:
         if self.robot_type == "G1":
             try:
                 cmd_rtabmap = [
-                    "ros2", "service", "call",
+                    "ros2",
+                    "service",
+                    "call",
                     "/rtabmap/backup",
-                    "std_srvs/srv/Empty"
+                    "std_srvs/srv/Empty",
                 ]
 
                 if self.logger:
                     self.logger.info("Saving G1 map using RTAB-Map backup...")
-                
-                result = subprocess.run(cmd_rtabmap, capture_output=True, text=True, timeout=30)
+
+                result = subprocess.run(
+                    cmd_rtabmap, capture_output=True, text=True, timeout=30
+                )
 
                 if result.returncode == 0:
                     if self.logger:
                         self.logger.info("RTAB-Map backup completed successfully")
-                    
+
                     return {
                         "status": "success",
                         "message": f"G1 map saved successfully using RTAB-Map backup",
                         "base_path": map_path,
                         "map_name": map_name,
-                        "info": "Map saved to RTAB-Map's configured database location"
+                        "info": "Map saved to RTAB-Map's configured database location",
                     }
                 else:
                     return {
                         "status": "error",
                         "message": "RTAB-Map backup failed",
-                        "errors": [f"Service call failed with return code {result.returncode}: {result.stderr}"]
+                        "errors": [
+                            f"Service call failed with return code {result.returncode}: {result.stderr}"
+                        ],
                     }
 
             except subprocess.TimeoutExpired:
                 return {
                     "status": "error",
                     "message": "RTAB-Map backup operation timed out",
-                    "errors": ["Operation exceeded 30 second timeout"]
+                    "errors": ["Operation exceeded 30 second timeout"],
                 }
             except Exception as e:
                 return {
                     "status": "error",
                     "message": "RTAB-Map backup failed",
-                    "errors": [str(e)]
+                    "errors": [str(e)],
                 }
-        
+
         # Non-G1 Robots: Use existing slam_toolbox methods
         else:
             files_created = []
@@ -111,20 +117,27 @@ class MapManager:
             # Save pose graph
             try:
                 cmd_posegraph = [
-                    "ros2", "service", "call",
+                    "ros2",
+                    "service",
+                    "call",
                     "/slam_toolbox/serialize_map",
                     "slam_toolbox/srv/SerializePoseGraph",
-                    f"{{filename: '{map_path}'}}"
+                    f"{{filename: '{map_path}'}}",
                 ]
 
                 if self.logger:
                     self.logger.info("Saving pose graph...")
-                result = subprocess.run(cmd_posegraph, capture_output=True, text=True, timeout=30)
+                result = subprocess.run(
+                    cmd_posegraph, capture_output=True, text=True, timeout=30
+                )
 
                 if "result=0" in result.stdout.lower():
-                    posegraph_files = [f for f in os.listdir(map_folder_path)
-                                     if f.startswith(map_name) and
-                                     (f.endswith('.posegraph') or f.endswith('.data'))]
+                    posegraph_files = [
+                        f
+                        for f in os.listdir(map_folder_path)
+                        if f.startswith(map_name)
+                        and (f.endswith(".posegraph") or f.endswith(".data"))
+                    ]
                     if posegraph_files:
                         files_created.extend(posegraph_files)
                         if self.logger:
@@ -140,10 +153,12 @@ class MapManager:
             # Save YAML map
             try:
                 cmd = [
-                    "ros2", "service", "call",
+                    "ros2",
+                    "service",
+                    "call",
                     "/slam_toolbox/save_map",
                     "slam_toolbox/srv/SaveMap",
-                    f"{{name: {{data: '{map_path}'}}}}"
+                    f"{{name: {{data: '{map_path}'}}}}",
                 ]
 
                 if self.logger:
@@ -151,9 +166,12 @@ class MapManager:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
                 if result.returncode == 0:
-                    yaml_files = [f for f in os.listdir(map_folder_path)
-                                 if f.startswith(map_name) and
-                                 (f.endswith('.yaml') or f.endswith('.pgm'))]
+                    yaml_files = [
+                        f
+                        for f in os.listdir(map_folder_path)
+                        if f.startswith(map_name)
+                        and (f.endswith(".yaml") or f.endswith(".pgm"))
+                    ]
                     if yaml_files:
                         files_created.extend(yaml_files)
                         if self.logger:
@@ -171,7 +189,7 @@ class MapManager:
                     "status": "success",
                     "message": f"Map saved successfully as {map_name}",
                     "files_created": files_created,
-                    "base_path": map_path
+                    "base_path": map_path,
                 }
             elif files_created and errors:
                 return {
@@ -179,13 +197,13 @@ class MapManager:
                     "message": f"Map partially saved as {map_name}. Some formats failed.",
                     "files_created": files_created,
                     "base_path": map_path,
-                    "errors": errors
+                    "errors": errors,
                 }
             else:
                 return {
                     "status": "error",
                     "message": "Map save failed completely",
-                    "errors": errors
+                    "errors": errors,
                 }
 
     def list_maps(self) -> List[MapInfo]:

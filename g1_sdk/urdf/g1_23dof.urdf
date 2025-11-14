@@ -25,17 +25,17 @@
       <material name="dark"/>
     </visual>
   </link>
-  
+
   <!-- Base footprint for navigation (ground projection) -->
   <link name="base_footprint"/>
-  
+
   <!-- Fixed joint connecting base_link to base_footprint -->
   <joint name="base_footprint_joint" type="fixed">
     <origin xyz="0 0 -0.787" rpy="0 0 0"/> <!-- Pelvis to ground distance -->
     <parent link="base_link"/>
     <child link="base_footprint"/>
   </joint>
-  
+
   <link name="pelvis_contour_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>

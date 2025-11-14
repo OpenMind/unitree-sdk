@@ -15,7 +15,7 @@ from om_api.msg import (
     OMModeRequest,
     OMTTSRequest,
     OMASRText,
-    OMAvatarFace,
+    OMAvatarFaceRequest,
 )
 
 if TYPE_CHECKING:
@@ -615,14 +615,14 @@ class ROSHandlers:
                     f"Failed to broadcast ASR text: {e}"
                 )
 
-    def avatar_face_callback(self, msg: OMAvatarFace):
+    def avatar_face_callback(self, msg: OMAvatarFaceRequest):
         """
         Callback function for avatar face messages to broadcast to frontend.
 
         Parameters:
         -----------
-        msg : OMAvatarFace
-            The incoming avatar face message.
+        msg : OMAvatarFaceRequest
+            The incoming avatar face request message.
         """
         if not hasattr(self.orchestrator, "cloud_connection_manager"):
             self.orchestrator.get_logger().warning(

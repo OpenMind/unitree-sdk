@@ -3,7 +3,7 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 
-from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMASRText, OMAvatarFace
+from om_api.msg import MapStorage, OMAPIRequest, OMAPIResponse, OMASRText, OMAvatarFaceRequest
 
 from ..handlers.ros_handlers import ROSHandlers
 from ..managers.cloud_connection_manager import CloudConnectionManager
@@ -68,7 +68,7 @@ class OrchestratorCloud(Node):
             OMASRText, "/om/asr/text", self.ros_handlers.asr_text_callback, 10
         )
         self.avatar_face_sub = self.create_subscription(
-            OMAvatarFace, "/om/avatar/face", self.ros_handlers.avatar_face_callback, 10
+            OMAvatarFaceRequest, "/om/avatar/face", self.ros_handlers.avatar_face_callback, 10
         )
 
 

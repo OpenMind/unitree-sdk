@@ -112,7 +112,7 @@ class OMPath(Node):
                 self.scan.angle_min, self.scan.angle_max, self.scan.angle_increment
             )
         )
-        angles_final = angles  # no flip
+        angles_final = angles
         data = list(zip(angles_final, self.scan.ranges))
 
         complexes = []
@@ -175,7 +175,7 @@ class OMPath(Node):
                 )
                 if dist_to_line < self.half_width_robot:
                     bad_paths.append(apath)
-                    blocked_by_obstacle_set.add(apath)
+                    blocked_by_obstacle_set.add(int(apath))
                     possible_paths = np.setdiff1d(possible_paths, np.array([apath]))
                     break
 
@@ -193,19 +193,19 @@ class OMPath(Node):
                     )
                     if dist_to_line < self.half_width_robot:
                         bad_paths.append(apath)
-                        blocked_by_hazard_set.add(apath)
+                        blocked_by_hazard_set.add(int(apath))
                         possible_paths = np.setdiff1d(possible_paths, np.array([apath]))
                         break
 
         # Convert sets to sorted index lists
-        blocked_by_obstacle_idx = sorted(blocked_by_obstacle_set)
-        blocked_by_hazard_idx = sorted(blocked_by_hazard_set)
+        blocked_by_obstacle_idx = [int(i) for i in sorted(blocked_by_obstacle_set)]
+        blocked_by_hazard_idx = [int(i) for i in sorted(blocked_by_hazard_set)]
 
         # Publish (same shape) + optional index lists for clarity
         paths_msg = Paths()
         paths_msg.header.stamp = self.get_clock().now().to_msg()
         paths_msg.header.frame_id = self.laser_frame
-        paths_msg.paths = possible_paths.tolist()
+        paths_msg.paths = [int(i) for i in possible_paths.tolist()]
 
         # Prefer index-style fields if your msg supports them
         if hasattr(paths_msg, "blocked_by_obstacle_idx"):

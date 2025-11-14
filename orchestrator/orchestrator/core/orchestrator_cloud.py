@@ -75,7 +75,7 @@ class OrchestratorCloud(Node):
         )
         self.avatar_face_sub = self.create_subscription(
             OMAvatarFaceRequest,
-            "/om/avatar/face",
+            "/om/avatar/request",
             self.ros_handlers.avatar_face_callback,
             10,
         )

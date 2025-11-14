@@ -34,7 +34,7 @@
                       ".*/om/tts/request",
                       ".*/om/tts/response",
                       ".*/om/asr/text",
-                      ".*/om/avatar/face",
+                      ".*/om/avatar/request",
 
                       // Motion control
                       ".*/cmd_vel",
@@ -141,7 +141,7 @@
                       ".*/om/tts/request",
                       ".*/om/tts/response",
                       ".*/om/asr/text",
-                      ".*/om/avatar/face",
+                      ".*/om/avatar/request",
 
                       // Motion control
                       ".*/cmd_vel",

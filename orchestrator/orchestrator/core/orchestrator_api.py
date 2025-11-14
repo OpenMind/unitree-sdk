@@ -49,7 +49,7 @@ class OrchestratorAPI(Node):
         self.slam_manager = ProcessManager(self.robot_type)
         self.nav2_manager = ProcessManager(self.robot_type)
 
-        self.map_manager = MapManager(self.maps_directory, self.get_logger())
+        self.map_manager = MapManager(self.maps_directory, self.robot_type, self.get_logger())
         self.location_manager = LocationManager(
             self.maps_directory, self.locations_directory, self.get_logger()
         )

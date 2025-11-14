@@ -1,6 +1,7 @@
 """
 Process lifecycle management for ROS2 launch files.
 """
+
 import os
 import signal
 import subprocess
@@ -46,7 +47,7 @@ class ProcessManager:
                 launch_file
             ]
             if map_yaml:
-                cmd.extend(['map_yaml_file:=' + map_yaml])
+                cmd.extend(["map_yaml_file:=" + map_yaml])
             self.process = subprocess.Popen(cmd, preexec_fn=os.setsid)
             return True
         return False

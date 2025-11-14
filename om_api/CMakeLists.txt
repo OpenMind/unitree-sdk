@@ -18,20 +18,23 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Paths.msg"
   "msg/MapStorage.msg"
+  "msg/LocalizationPose.msg"
   "msg/OMAPIRequest.msg"
   "msg/OMAPIResponse.msg"
   "msg/OMAIRequest.msg"
   "msg/OMAIReponse.msg"
+  "msg/OMASRText.msg"
   "msg/OMModeRequest.msg"
   "msg/OMModeReponse.msg"
   "msg/OMTTSRequest.msg"
   "msg/OMTTSReponse.msg"
-  DEPENDENCIES std_msgs
+  DEPENDENCIES std_msgs geometry_msgs
 )
 
 if(BUILD_TESTING)

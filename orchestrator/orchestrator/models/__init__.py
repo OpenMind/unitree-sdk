@@ -1,11 +1,11 @@
 from .data_models import (
-    PositionModel,
-    OrientationModel,
-    PoseModel,
+    ChargingStatus,
     LocationModel,
     MapInfo,
+    OrientationModel,
+    PoseModel,
+    PositionModel,
     ProcessStatus,
-    ChargingStatus
 )
 
 __all__ = [
@@ -15,5 +15,5 @@ __all__ = [
     "LocationModel",
     "MapInfo",
     "ProcessStatus",
-    "ChargingStatus"
+    "ChargingStatus",
 ]

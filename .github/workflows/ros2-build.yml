@@ -1,0 +1,70 @@
+name: ROS2 Build Test
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  ros2-build:
+    runs-on: ubuntu-latest
+    container:
+      image: ros:humble-ros-base-jammy
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup ROS2 workspace
+      shell: bash
+      run: |
+        # Source ROS2 setup
+        source /opt/ros/humble/setup.bash
+
+        # Create workspace
+        mkdir -p /tmp/ros2_ws/src
+
+        # Copy source code to workspace
+        cp -r . /tmp/ros2_ws/src/
+
+        # Change to workspace directory
+        cd /tmp/ros2_ws
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        cd /tmp/ros2_ws
+        source /opt/ros/humble/setup.bash
+
+        # Update package lists
+        apt-get update
+
+        # Install rosdep if not already installed
+        apt-get install -y python3-rosdep \
+        ros-humble-rosidl-generator-dds-idl
+
+        # Initialize rosdep if needed
+        if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+          rosdep init
+        fi
+        rosdep update
+
+        # Install dependencies
+        rosdep install --from-paths src --ignore-src -r -y
+
+    - name: Build ROS2 packages
+      shell: bash
+      run: |
+        cd /tmp/ros2_ws
+        source /opt/ros/humble/setup.bash
+
+        # Build all packages
+        colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+        # Source the built workspace
+        source install/setup.bash
+
+        echo "ROS2 build completed successfully!"

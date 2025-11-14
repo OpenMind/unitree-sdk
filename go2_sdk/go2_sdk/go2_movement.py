@@ -1,14 +1,18 @@
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
-from unitree_api.msg import Request, RequestHeader, RequestIdentity
 import json
+
+import rclpy
+from geometry_msgs.msg import Twist
+from rclpy.node import Node
+
+from unitree_api.msg import Request, RequestHeader, RequestIdentity
+
 
 class CmdVelToSportNode(Node):
     """
     A ROS2 node that converts cmd_vel (geometry_msgs/Twist) messages
     to Unitree Go2 sport commands for robot movement control.
     """
+
     def __init__(self):
         super().__init__("cmd_vel_to_sport_node")
 
@@ -17,17 +21,10 @@ class CmdVelToSportNode(Node):
         self.SPORT_API_ID_STOPMOVE = 1003
 
         self.cmd_vel_subscriber = self.create_subscription(
-            Twist,
-            "cmd_vel",
-            self.cmd_vel_callback,
-            10
+            Twist, "cmd_vel", self.cmd_vel_callback, 10
         )
 
-        self.sport_publisher = self.create_publisher(
-            Request,
-            "/api/sport/request",
-            10
-        )
+        self.sport_publisher = self.create_publisher(Request, "/api/sport/request", 10)
 
         self.max_linear_velocity = 1.0  # m/s
         self.max_angular_velocity = 1.0  # rad/s
@@ -55,9 +52,15 @@ class CmdVelToSportNode(Node):
         linear_y = msg.linear.y
         angular_z = msg.angular.z
 
-        linear_x = max(-self.max_linear_velocity, min(self.max_linear_velocity, linear_x))
-        linear_y = max(-self.max_linear_velocity, min(self.max_linear_velocity, linear_y))
-        angular_z = max(-self.max_angular_velocity, min(self.max_angular_velocity, angular_z))
+        linear_x = max(
+            -self.max_linear_velocity, min(self.max_linear_velocity, linear_x)
+        )
+        linear_y = max(
+            -self.max_linear_velocity, min(self.max_linear_velocity, linear_y)
+        )
+        angular_z = max(
+            -self.max_angular_velocity, min(self.max_angular_velocity, angular_z)
+        )
 
         request_msg = Request()
 
@@ -68,7 +71,7 @@ class CmdVelToSportNode(Node):
         move_params = {
             "x": float(linear_x),
             "y": float(linear_y),
-            "z": float(angular_z)
+            "z": float(angular_z),
         }
         request_msg.parameter = json.dumps(move_params)
 
@@ -108,6 +111,7 @@ class CmdVelToSportNode(Node):
         self.sport_publisher.publish(request_msg)
         self.get_logger().info("Published balance stand command")
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -121,6 +125,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

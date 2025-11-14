@@ -13,5 +13,3 @@ float32[4] range_obstacle
 int16[4] foot_force
 float32[12] foot_position_body
 float32[12] foot_speed_body
-
-

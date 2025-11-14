@@ -1,6 +1,7 @@
 import os
 import subprocess
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from ..models.data_models import MapInfo
 
 
@@ -27,7 +28,9 @@ class MapManager:
         self.logger = logger
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
 
-    def save_map(self, map_name: str, map_directory: Optional[str] = None) -> Dict[str, Any]:
+    def save_map(
+        self, map_name: str, map_directory: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Save the current map.
         For G1 robots: Uses RTAB-Map backup only.
@@ -200,16 +203,21 @@ class MapManager:
         for root, dirs, files in os.walk(self.maps_directory):
             for dir_name in dirs:
                 dir_path = os.path.join(root, dir_name)
-                map_files = [f for f in os.listdir(dir_path)
-                           if f.startswith(dir_name) and
-                           (f.endswith('.yaml') or f.endswith('.pgm') or
-                            f.endswith('.posegraph') or f.endswith('.data'))]
+                map_files = [
+                    f
+                    for f in os.listdir(dir_path)
+                    if f.startswith(dir_name)
+                    and (
+                        f.endswith(".yaml")
+                        or f.endswith(".pgm")
+                        or f.endswith(".posegraph")
+                        or f.endswith(".data")
+                    )
+                ]
                 if map_files:
-                    maps.append(MapInfo(
-                        map_name=dir_name,
-                        files=map_files,
-                        path=dir_path
-                    ))
+                    maps.append(
+                        MapInfo(map_name=dir_name, files=map_files, path=dir_path)
+                    )
         return maps
 
     def delete_map(self, map_name: str) -> Dict[str, str]:
@@ -226,7 +234,7 @@ class MapManager:
         Dict[str, str]
             Dictionary containing status and message.
         """
-        if not map_name or any(char in map_name for char in ['/', '\\', '..', ' ']):
+        if not map_name or any(char in map_name for char in ["/", "\\", "..", " "]):
             return {"status": "error", "message": "Invalid map name"}
 
         map_path = os.path.join(self.maps_directory, map_name)

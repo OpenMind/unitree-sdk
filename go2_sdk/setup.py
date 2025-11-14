@@ -35,6 +35,7 @@ setup(
             "joint_state_publisher = go2_sdk.joint_state:main",
             "d435_obstacle_dector = go2_sdk.d435_obstacle_dector:main",
             "om_path = go2_sdk.om_path:main",
+            # "local_traversability_node = go2_sdk.local_traversability_node:main",
             "go2_sport_action = go2_sdk.go2_sport_action:main",
             "crsf_controller = go2_sdk.crsf_controller:main",
             "go2_camera_stream = go2_sdk.go2_camera_stream:main",

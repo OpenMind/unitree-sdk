@@ -10,37 +10,39 @@ from typing import Optional
 class ProcessManager:
     """
     ProcessManager handles starting and stopping of ROS2 launch files as subprocesses.
+    robot_type is set at construction (from environment variable in orchestrator).
     """
 
-    def __init__(self):
+    def __init__(self, robot_type: str = "Go2"):
         """
-        Initialize the ProcessManager with no active process.
+        Initialize the ProcessManager with no active process and robot type.
+        robot_type: "Go2" or "G1" (set at orchestrator startup)
         """
         self.process: Optional[subprocess.Popen] = None
+        self.robot_type = robot_type
 
     def start(self, launch_file: str, map_yaml: Optional[str] = None) -> bool:
         """
-        Start a ROS2 launch file as a subprocess.
+        Start a ROS2 launch file as a subprocess, selecting the correct package for robot type.
 
         Parameters:
         ----------
         launch_file : str
-            The name of the launch file to run (e.g., 'slam_launch.py' or
-            'nav2_launch.py').
+            The name of the launch file to run (e.g., 'slam_launch.py' or 'nav2_launch.py').
         map_yaml : Optional[str]
             The path to the map YAML file, if applicable.
 
         Returns:
         -------
         bool
-            True if the process was started successfully, False if a process is
-            already running.
+            True if the process was started successfully, False if a process is already running.
         """
         if self.process is None or self.process.poll() is not None:
+            package = 'g1_sdk' if self.robot_type == 'G1' else 'go2_sdk'
             cmd = [
                 'ros2',
                 'launch',
-                'go2_sdk',
+                package,
                 launch_file
             ]
             if map_yaml:

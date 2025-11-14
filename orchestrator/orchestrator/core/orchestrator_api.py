@@ -48,8 +48,7 @@ class OrchestratorAPI(Node):
 
         self.flask_service.register_routes(self.api_handlers)
 
-        self._setup_ros_publishers()
-        self._setup_ros_subscribers()
+
 
         self.flask_service.start()
 
@@ -77,7 +76,6 @@ class OrchestratorAPI(Node):
         self.ai_request_sub = self.create_subscription(OMAIReponse, '/om/ai/response', self.ros_handlers.ai_response_callback, 10)
         self.mode_request_sub = self.create_subscription(OMModeReponse, '/om/mode/response', self.ros_handlers.mode_response_callback, 10)
         self.tts_request_sub = self.create_subscription(OMTTSReponse, '/om/tts/response', self.ros_handlers.tts_response_callback, 10)
-        self.lowcmd_sub = self.create_subscription(LowCmd, '/lowcmd', self.ros_handlers.lowcmd_callback, 1)
 
     def is_slam_running(self) -> bool:
         """

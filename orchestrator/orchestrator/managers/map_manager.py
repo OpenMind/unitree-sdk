@@ -9,7 +9,7 @@ class MapManager:
     Manages map operations including saving, listing, and deleting maps.
     """
 
-    def __init__(self, maps_directory: str, logger=None):
+    def __init__(self, maps_directory: str, robot_type: str = "default", logger=None):
         """
         Initialize the MapManager.
 
@@ -17,16 +17,21 @@ class MapManager:
         -----------
         maps_directory : str
             Directory where maps are stored.
+        robot_type : str
+            Type of robot (e.g., "G1", "go2", "default").
         logger
             Logger instance for logging operations.
         """
         self.maps_directory = os.path.abspath(maps_directory)
+        self.robot_type = robot_type
         self.logger = logger
         os.makedirs(self.maps_directory, mode=0o755, exist_ok=True)
 
     def save_map(self, map_name: str, map_directory: Optional[str] = None) -> Dict[str, Any]:
         """
-        Save the current map using both slam_toolbox and standard ROS2 formats.
+        Save the current map.
+        For G1 robots: Uses RTAB-Map backup only.
+        For other robots: Uses slam_toolbox and standard ROS2 formats.
 
         Parameters:
         ----------
@@ -50,88 +55,137 @@ class MapManager:
 
         map_path = os.path.join(map_folder_path, map_name)
 
-        files_created = []
-        errors = []
+        # G1 Robot: Use RTAB-Map backup
+        if self.robot_type == "G1":
+            try:
+                cmd_rtabmap = [
+                    "ros2", "service", "call",
+                    "/rtabmap/backup",
+                    "std_srvs/srv/Empty"
+                ]
 
-        # Save pose graph
-        try:
-            cmd_posegraph = [
-                "ros2", "service", "call",
-                "/slam_toolbox/serialize_map",
-                "slam_toolbox/srv/SerializePoseGraph",
-                f"{{filename: '{map_path}'}}"
-            ]
+                if self.logger:
+                    self.logger.info("Saving G1 map using RTAB-Map backup...")
+                
+                result = subprocess.run(cmd_rtabmap, capture_output=True, text=True, timeout=30)
 
-            if self.logger:
-                self.logger.info("Saving pose graph...")
-            result = subprocess.run(cmd_posegraph, capture_output=True, text=True, timeout=30)
-
-            if "result=0" in result.stdout.lower():
-                posegraph_files = [f for f in os.listdir(map_folder_path)
-                                 if f.startswith(map_name) and
-                                 (f.endswith('.posegraph') or f.endswith('.data'))]
-                if posegraph_files:
-                    files_created.extend(posegraph_files)
+                if result.returncode == 0:
                     if self.logger:
-                        self.logger.info(f"Posegraph saved: {posegraph_files}")
-            else:
-                errors.append(f"Posegraph save failed: {result.stderr}")
+                        self.logger.info("RTAB-Map backup completed successfully")
+                    
+                    # Note: RTAB-Map backup saves to its own configured location
+                    # You may need to check the RTAB-Map configuration for actual file location
+                    return {
+                        "status": "success",
+                        "message": f"G1 map saved successfully using RTAB-Map backup",
+                        "base_path": map_path,
+                        "map_name": map_name,
+                        "info": "Map saved to RTAB-Map's configured database location"
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "message": "RTAB-Map backup failed",
+                        "errors": [f"Service call failed with return code {result.returncode}: {result.stderr}"]
+                    }
 
-        except subprocess.TimeoutExpired:
-            errors.append("Posegraph save operation timed out")
-        except Exception as e:
-            errors.append(f"Posegraph save failed: {str(e)}")
-
-        # Save YAML map
-        try:
-            cmd = [
-                "ros2", "service", "call",
-                "/slam_toolbox/save_map",
-                "slam_toolbox/srv/SaveMap",
-                f"{{name: {{data: '{map_path}'}}}}"
-            ]
-
-            if self.logger:
-                self.logger.info("Saving YAML map...")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-            if result.returncode == 0:
-                yaml_files = [f for f in os.listdir(map_folder_path)
-                             if f.startswith(map_name) and
-                             (f.endswith('.yaml') or f.endswith('.pgm'))]
-                if yaml_files:
-                    files_created.extend(yaml_files)
-                    if self.logger:
-                        self.logger.info(f"YAML map saved: {yaml_files}")
-            else:
-                errors.append(f"YAML save failed: {result.stderr}")
-
-        except subprocess.TimeoutExpired:
-            errors.append("YAML save operation timed out")
-        except Exception as e:
-            errors.append(f"YAML save failed: {str(e)}")
-
-        if files_created and not errors:
-            return {
-                "status": "success",
-                "message": f"Map saved successfully as {map_name}",
-                "files_created": files_created,
-                "base_path": map_path
-            }
-        elif files_created and errors:
-            return {
-                "status": "partial_success",
-                "message": f"Map partially saved as {map_name}. Some formats failed.",
-                "files_created": files_created,
-                "base_path": map_path,
-                "errors": errors
-            }
+            except subprocess.TimeoutExpired:
+                return {
+                    "status": "error",
+                    "message": "RTAB-Map backup operation timed out",
+                    "errors": ["Operation exceeded 30 second timeout"]
+                }
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": "RTAB-Map backup failed",
+                    "errors": [str(e)]
+                }
+        
+        # Non-G1 Robots: Use existing slam_toolbox methods
         else:
-            return {
-                "status": "error",
-                "message": "Map save failed completely",
-                "errors": errors
-            }
+            files_created = []
+            errors = []
+
+            # Save pose graph
+            try:
+                cmd_posegraph = [
+                    "ros2", "service", "call",
+                    "/slam_toolbox/serialize_map",
+                    "slam_toolbox/srv/SerializePoseGraph",
+                    f"{{filename: '{map_path}'}}"
+                ]
+
+                if self.logger:
+                    self.logger.info("Saving pose graph...")
+                result = subprocess.run(cmd_posegraph, capture_output=True, text=True, timeout=30)
+
+                if "result=0" in result.stdout.lower():
+                    posegraph_files = [f for f in os.listdir(map_folder_path)
+                                     if f.startswith(map_name) and
+                                     (f.endswith('.posegraph') or f.endswith('.data'))]
+                    if posegraph_files:
+                        files_created.extend(posegraph_files)
+                        if self.logger:
+                            self.logger.info(f"Posegraph saved: {posegraph_files}")
+                else:
+                    errors.append(f"Posegraph save failed: {result.stderr}")
+
+            except subprocess.TimeoutExpired:
+                errors.append("Posegraph save operation timed out")
+            except Exception as e:
+                errors.append(f"Posegraph save failed: {str(e)}")
+
+            # Save YAML map
+            try:
+                cmd = [
+                    "ros2", "service", "call",
+                    "/slam_toolbox/save_map",
+                    "slam_toolbox/srv/SaveMap",
+                    f"{{name: {{data: '{map_path}'}}}}"
+                ]
+
+                if self.logger:
+                    self.logger.info("Saving YAML map...")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+                if result.returncode == 0:
+                    yaml_files = [f for f in os.listdir(map_folder_path)
+                                 if f.startswith(map_name) and
+                                 (f.endswith('.yaml') or f.endswith('.pgm'))]
+                    if yaml_files:
+                        files_created.extend(yaml_files)
+                        if self.logger:
+                            self.logger.info(f"YAML map saved: {yaml_files}")
+                else:
+                    errors.append(f"YAML save failed: {result.stderr}")
+
+            except subprocess.TimeoutExpired:
+                errors.append("YAML save operation timed out")
+            except Exception as e:
+                errors.append(f"YAML save failed: {str(e)}")
+
+            if files_created and not errors:
+                return {
+                    "status": "success",
+                    "message": f"Map saved successfully as {map_name}",
+                    "files_created": files_created,
+                    "base_path": map_path
+                }
+            elif files_created and errors:
+                return {
+                    "status": "partial_success",
+                    "message": f"Map partially saved as {map_name}. Some formats failed.",
+                    "files_created": files_created,
+                    "base_path": map_path,
+                    "errors": errors
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": "Map save failed completely",
+                    "errors": errors
+                }
 
     def list_maps(self) -> List[MapInfo]:
         """

@@ -110,12 +110,18 @@ def generate_launch_description():
             remappings=[('/cmd_vel', '/cmd_vel_nav'),
                        ('/cmd_vel_smoothed', '/cmd_vel')]
         ),
+        Node(
+            package='g1_sdk',
+            executable='g1_nav2_api',
+            name='g1_nav2_api',
+            output='screen',
+        ),
     ]
 
     return LaunchDescription([
         slam_launch,
         TimerAction(
-            period=6.0,
+            period=5.0,
             actions=delayed_nodes
         )
     ])

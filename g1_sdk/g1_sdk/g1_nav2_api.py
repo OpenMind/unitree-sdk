@@ -20,12 +20,12 @@ status_map = {
     6: "ABORTED"
 }
 
-class Go2APINode(Node):
+class G1APINode(Node):
     """
-    A ROS2 node that provides a REST API for interacting with the Unitree Go2 robot.
+    A ROS2 node that provides a REST API for interacting with the Unitree G1 robot (RTAB-Map).
     """
     def __init__(self):
-        super().__init__("go2_nav2_api_node")
+        super().__init__("g1_nav2_api_node")
 
         self.pose_subscription = self.create_subscription(
             PoseStamped,
@@ -40,10 +40,11 @@ class Go2APINode(Node):
             10
         )
 
-        self.amcl_subscription = self.create_subscription(
+        # For Unitree G1 with RTAB-Map: subscribe to /localization_pose for localization
+        self.localization_subscription = self.create_subscription(
             PoseWithCovarianceStamped,
-            '/amcl_pose',
-            self.amcl_callback,
+            '/localization_pose',
+            self.localization_callback,
             10
         )
 
@@ -62,7 +63,7 @@ class Go2APINode(Node):
 
         self.map_subscription = self.create_subscription(
             OccupancyGrid,
-            '/map',
+            '/grid_prob_map',
             self.map_callback,
             map_qos
         )
@@ -78,7 +79,7 @@ class Go2APINode(Node):
         self.api_thread = threading.Thread(target=self.run_flask_app)
         self.api_thread.start()
 
-        self.get_logger().info("Go2 API Node initialized")
+    self.get_logger().info("G1 API Node initialized")
 
     def run_flask_app(self):
         """
@@ -92,7 +93,7 @@ class Go2APINode(Node):
         """
         @self.app.route('/api/status', methods=['GET'])
         def get_status():
-            return jsonify({"status": "OK", "message": "Go2 API is running"}), 200
+            return jsonify({"status": "OK", "message": "G1 API is running"}), 200
 
         @self.app.route('/api/pose', methods=['GET'])
         def get_pose():
@@ -257,19 +258,20 @@ class Go2APINode(Node):
         self.pose_data.pose.pose = msg.pose
         self.pose_data.pose.covariance = covariance
 
-    def amcl_callback(self, msg: PoseWithCovarianceStamped):
+    def localization_callback(self, msg: PoseWithCovarianceStamped):
         """
-        Callback function for AMCL pose updates.
-        Updates the internal pose data and logs the received AMCL pose.
+        Callback for Unitree G1 localization updates from RTAB-Map (/localization_pose).
+        Updates the internal pose data and logs the received localization pose.
 
         Parameters:
         -----------
         msg : geometry_msgs.msg.PoseWithCovarianceStamped
-            The incoming AMCL pose message containing the robot's pose with covariance.
+            The incoming localization pose message containing the robot's pose with covariance.
         """
         if self.pose_data is None:
             self.pose_data = PoseWithCovarianceStamped()
         self.pose_data.pose.covariance = msg.pose.covariance
+        self.get_logger().info("[G1] Updated localization covariance from /localization_pose.")
 
     def goal_status_callback(self, msg: GoalStatusArray):
         """
@@ -298,16 +300,16 @@ class Go2APINode(Node):
 
 def main(args=None):
     """
-    Main function to initialize the ROS2 node and start the API.
+    Main function to initialize the ROS2 node and start the G1 API.
     """
     rclpy.init(args=args)
 
-    go2_api_node = Go2APINode()
+    g1_api_node = G1APINode()
 
     try:
-        rclpy.spin(go2_api_node)
+        rclpy.spin(g1_api_node)
     except KeyboardInterrupt:
         pass
     finally:
-        go2_api_node.destroy_node()
+        g1_api_node.destroy_node()
         rclpy.shutdown()

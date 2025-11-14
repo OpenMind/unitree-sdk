@@ -45,6 +45,7 @@ setup(
             'pose_to_tf = g1_sdk.pose_to_tf:main',
             'g1_odom = g1_sdk.g1_odom:main',
             'g1_jointstate = g1_sdk.g1_jointstate:main',
+            'g1_nav2_api = g1_sdk.g1_nav2_api:main',
         ],
     },
 )

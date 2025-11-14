@@ -76,8 +76,6 @@ class MapManager:
                     if self.logger:
                         self.logger.info("RTAB-Map backup completed successfully")
                     
-                    # Note: RTAB-Map backup saves to its own configured location
-                    # You may need to check the RTAB-Map configuration for actual file location
                     return {
                         "status": "success",
                         "message": f"G1 map saved successfully using RTAB-Map backup",

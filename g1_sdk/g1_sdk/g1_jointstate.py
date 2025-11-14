@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+import traceback
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
-from unitree_hg.msg import LowState  # Correct package based on your output
+from unitree_hg.msg import LowState
 
 
 class G1JointStatePublisher(Node):
@@ -11,14 +13,12 @@ class G1JointStatePublisher(Node):
         super().__init__("g1_joint_state_publisher")
 
         # Publisher for joint states
-        self.joint_state_pub = self.create_publisher(
-            JointState, "joint_states", 10  # Note: no leading slash for ROS2
-        )
+        self.joint_state_pub = self.create_publisher(JointState, "joint_states", 10)
 
         # Subscribe to Unitree's low-level state
         self.low_state_sub = self.create_subscription(
             LowState,
-            "lowstate",  # Note: no /rt/ prefix based on your echo command
+            "lowstate",
             self.low_state_callback,
             10,
         )
@@ -121,16 +121,6 @@ class G1JointStatePublisher(Node):
 
             # Publish joint state
             self.joint_state_pub.publish(joint_state)
-
-            # Log first few messages and then periodically
-            # if self.msg_count <= 3 or self.msg_count % 100 == 0:
-            #     self.get_logger().info(f'Message #{self.msg_count}: Published {len(joint_state.name)} joints')
-            #     if self.msg_count <= 3:
-            #         # Show first few active joints for debugging
-            #         for idx, name, pos in active_motors[:5]:
-            #             self.get_logger().info(f'  Motor[{idx}] {name}: {pos:.4f} rad')
-            #     else:
-            #         self.get_logger().info(f'  Active motors: {len(active_motors)}/{len(self.motor_to_joint_map)}')
 
         except Exception as e:
             # self.get_logger().error(f'Error processing low state: {str(e)}')

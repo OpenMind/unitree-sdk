@@ -1,19 +1,26 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration, EnvironmentVariable
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory('g1_sdk')
-
     nav2_config_file = os.path.join(pkg_dir, 'config', 'nav2_parameters.yaml')
-    # map_yaml_file removed, not needed since map/localization is handled by rtabmap
+    slam_launch_file = os.path.join(pkg_dir, 'launch', 'slam_launch.py')
+    
+    from launch.actions import TimerAction
 
-    return LaunchDescription([
-        # map_yaml_file argument removed
+    # Include SLAM launch file with localization mode
+    slam_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(slam_launch_file),
+        launch_arguments={'localization': 'true'}.items()
+    )
 
+    # Nodes to be launched after delay
+    delayed_nodes = [
         Node(
             package='pointcloud_to_laserscan',
             executable='pointcloud_to_laserscan_node',
@@ -37,7 +44,6 @@ def generate_launch_description():
                 'use_inf': True,
             }]
         ),
-
         Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
@@ -46,14 +52,13 @@ def generate_launch_description():
             parameters=[{'use_sim_time': False},
                        {'autostart': True},
                        {'node_names': ['controller_server',
-                                      'smoother_server',
-                                      'planner_server',
-                                      'behavior_server',
-                                      'bt_navigator',
-                                      'waypoint_follower',
-                                      'velocity_smoother']}]
+                                     'smoother_server',
+                                     'planner_server',
+                                     'behavior_server',
+                                     'bt_navigator',
+                                     'waypoint_follower',
+                                     'velocity_smoother']}]
         ),
-
         Node(
             package='nav2_controller',
             executable='controller_server',
@@ -61,7 +66,6 @@ def generate_launch_description():
             parameters=[nav2_config_file],
             remappings=[('/cmd_vel', '/cmd_vel')]
         ),
-
         Node(
             package='nav2_smoother',
             executable='smoother_server',
@@ -69,7 +73,6 @@ def generate_launch_description():
             output='screen',
             parameters=[nav2_config_file]
         ),
-
         Node(
             package='nav2_planner',
             executable='planner_server',
@@ -77,7 +80,6 @@ def generate_launch_description():
             output='screen',
             parameters=[nav2_config_file]
         ),
-
         Node(
             package='nav2_behaviors',
             executable='behavior_server',
@@ -85,7 +87,6 @@ def generate_launch_description():
             output='screen',
             parameters=[nav2_config_file]
         ),
-
         Node(
             package='nav2_bt_navigator',
             executable='bt_navigator',
@@ -93,7 +94,6 @@ def generate_launch_description():
             output='screen',
             parameters=[nav2_config_file]
         ),
-
         Node(
             package='nav2_waypoint_follower',
             executable='waypoint_follower',
@@ -101,7 +101,6 @@ def generate_launch_description():
             output='screen',
             parameters=[nav2_config_file]
         ),
-
         Node(
             package='nav2_velocity_smoother',
             executable='velocity_smoother',
@@ -111,6 +110,12 @@ def generate_launch_description():
             remappings=[('/cmd_vel', '/cmd_vel_nav'),
                        ('/cmd_vel_smoothed', '/cmd_vel')]
         ),
+    ]
 
-        
+    return LaunchDescription([
+        slam_launch,
+        TimerAction(
+            period=6.0,
+            actions=delayed_nodes
+        )
     ])

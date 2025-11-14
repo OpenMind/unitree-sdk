@@ -12,10 +12,10 @@ from om_api.msg import (
     OMAIRequest,
     OMAPIRequest,
     OMAPIResponse,
-    OMModeRequest,
-    OMTTSRequest,
     OMASRText,
     OMAvatarFaceRequest,
+    OMModeRequest,
+    OMTTSRequest,
 )
 
 if TYPE_CHECKING:

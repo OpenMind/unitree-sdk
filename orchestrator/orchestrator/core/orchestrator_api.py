@@ -22,6 +22,7 @@ class OrchestratorAPI(Node):
     various components of the robot system.
     """
 
+
     def __init__(self):
         super().__init__('orchestrator_api')
 
@@ -46,12 +47,11 @@ class OrchestratorAPI(Node):
         self.api_handlers = APIHandlers(self)
         self.ros_handlers = ROSHandlers(self)
 
+        self._setup_ros_publishers()
+        self._setup_ros_subscribers()
+
         self.flask_service.register_routes(self.api_handlers)
-
-
-
         self.flask_service.start()
-
         self.get_logger().info("Orchestrator API Node has been started.")
 
 

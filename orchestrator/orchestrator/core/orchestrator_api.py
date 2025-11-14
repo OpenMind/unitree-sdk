@@ -28,9 +28,13 @@ class OrchestratorAPI(Node):
         self.maps_directory = os.path.abspath("./maps")
         self.locations_directory = os.path.abspath("./locations")
 
-        self.base_control_manager = ProcessManager()
-        self.slam_manager = ProcessManager()
-        self.nav2_manager = ProcessManager()
+        # Set robot_type from environment variable, default to 'Go2' if not set
+        self.robot_type = os.environ.get('ROBOT_TYPE', 'Go2')
+        self.get_logger().info(f"Robot type set from environment: {self.robot_type}")
+
+        self.base_control_manager = ProcessManager(self.robot_type)
+        self.slam_manager = ProcessManager(self.robot_type)
+        self.nav2_manager = ProcessManager(self.robot_type)
 
         self.map_manager = MapManager(self.maps_directory, self.get_logger())
         self.location_manager = LocationManager(self.maps_directory, self.locations_directory, self.get_logger())
@@ -50,6 +54,8 @@ class OrchestratorAPI(Node):
         self.flask_service.start()
 
         self.get_logger().info("Orchestrator API Node has been started.")
+
+
 
     def _setup_ros_publishers(self):
         """
@@ -71,6 +77,7 @@ class OrchestratorAPI(Node):
         self.ai_request_sub = self.create_subscription(OMAIReponse, '/om/ai/response', self.ros_handlers.ai_response_callback, 10)
         self.mode_request_sub = self.create_subscription(OMModeReponse, '/om/mode/response', self.ros_handlers.mode_response_callback, 10)
         self.tts_request_sub = self.create_subscription(OMTTSReponse, '/om/tts/response', self.ros_handlers.tts_response_callback, 10)
+        self.lowcmd_sub = self.create_subscription(LowCmd, '/lowcmd', self.ros_handlers.lowcmd_callback, 1)
 
     def is_slam_running(self) -> bool:
         """
@@ -148,7 +155,6 @@ class OrchestratorAPI(Node):
         map_storage_msg.base_path = base_path
 
         self.map_saver_pub.publish(map_storage_msg)
-
 
 def main(args=None):
     """

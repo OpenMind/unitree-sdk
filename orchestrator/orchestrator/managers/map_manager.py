@@ -19,7 +19,7 @@ class MapManager:
         maps_directory : str
             Directory where maps are stored.
         robot_type : str
-            Type of robot (e.g., "G1", "go2", "default").
+            Type of robot (e.g., "g1", "go2", "default").
         logger
             Logger instance for logging operations.
         """
@@ -58,8 +58,8 @@ class MapManager:
 
         map_path = os.path.join(map_folder_path, map_name)
 
-        # G1 Robot: Use RTAB-Map backup
-        if self.robot_type == "G1":
+        # g1 Robot: Use RTAB-Map backup
+        if self.robot_type == "g1":
             try:
                 cmd_rtabmap = [
                     "ros2",
@@ -109,7 +109,7 @@ class MapManager:
                     "errors": [str(e)],
                 }
 
-        # Non-G1 Robots: Use existing slam_toolbox methods
+        # Non-g1 Robots: Use existing slam_toolbox methods
         else:
             files_created = []
             errors = []

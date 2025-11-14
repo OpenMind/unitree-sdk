@@ -40,8 +40,8 @@ class OrchestratorAPI(Node):
         self.maps_directory = os.path.abspath("./maps")
         self.locations_directory = os.path.abspath("./locations")
 
-        # Set robot_type from environment variable, default to 'Go2' if not set
-        self.robot_type = os.environ.get("ROBOT_TYPE", "Go2")
+        # Set robot_type from environment variable, default to 'go2' if not set
+        self.robot_type = os.environ.get("ROBOT_TYPE", "go2")
         self.get_logger().info(f"Robot type set from environment: {self.robot_type}")
 
         self.base_control_manager = ProcessManager(self.robot_type)

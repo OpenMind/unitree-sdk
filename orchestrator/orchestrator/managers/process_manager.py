@@ -14,10 +14,10 @@ class ProcessManager:
     robot_type is set at construction (from environment variable in orchestrator).
     """
 
-    def __init__(self, robot_type: str = "Go2"):
+    def __init__(self, robot_type: str = "go2"):
         """
         Initialize the ProcessManager with no active process and robot type.
-        robot_type: "Go2" or "G1" (set at orchestrator startup)
+        robot_type: "go2" or "g1" (set at orchestrator startup)
         """
         self.process: Optional[subprocess.Popen] = None
         self.robot_type = robot_type
@@ -39,7 +39,7 @@ class ProcessManager:
             True if the process was started successfully, False if a process is already running.
         """
         if self.process is None or self.process.poll() is not None:
-            package = "g1_sdk" if self.robot_type == "G1" else "go2_sdk"
+            package = "g1_sdk" if self.robot_type == "g1" else "go2_sdk"
             cmd = ["ros2", "launch", package, launch_file]
             if map_yaml:
                 cmd.extend(["map_yaml_file:=" + map_yaml])

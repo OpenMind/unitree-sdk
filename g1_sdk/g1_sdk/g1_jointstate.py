@@ -123,10 +123,8 @@ class G1JointStatePublisher(Node):
             self.joint_state_pub.publish(joint_state)
 
         except Exception as e:
-            # self.get_logger().error(f'Error processing low state: {str(e)}')
-            import traceback
-
-            # self.get_logger().error(f'Traceback: {traceback.format_exc()}')
+            self.get_logger().error(f"Error processing low state: {e}")
+            self.get_logger().error(traceback.format_exc())
 
 
 def main(args=None):

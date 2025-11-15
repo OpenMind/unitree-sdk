@@ -39,13 +39,12 @@ def generate_launch_description():
             "qos_scan": qos,
             "qos_odom": qos,
             "database_path": database_path,
-            # ============= ADDED: Database disk-based saving =============
+            # Database disk-based saving
             # Force continuous disk writes instead of memory-only operation
             "Db/Sqlite3/InMemory": "false",  # Critical: Write to disk continuously
             "Db/Sqlite3/JournalMode": "WAL",  # Write-Ahead Logging for crash safety
             "Db/Sqlite3/CacheSize": "10000",  # Cache size (lower = more frequent writes)
             "Db/Sqlite3/Synchronous": "NORMAL",  # Balance between safety and speed
-            # ==============================================================
             # RTAB-Map parameters
             "Rtabmap/DetectionRate": "1.0",
             "Rtabmap/CreateIntermediateNodes": "true",

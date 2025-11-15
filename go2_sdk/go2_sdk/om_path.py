@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Run:
-PYTHONNOUSERSITE=1 python3 /home/openmind/Desktop/wendy-work-station/unitree_go2_ros2_sdk/go2_sdk/go2_sdk/om_path_trave_base.py \
-  --ros-args -p hazard_topic_pc2:=/traversability/hazard_points2
-"""
-
 import math
 
 import numpy as np
@@ -102,13 +93,11 @@ class OMPath(Node):
         for angle, distance in data:
             d_m = distance
 
-            # v2-style filtering (keep exactly this!)
             if not math.isfinite(d_m) or d_m > 5.0 or d_m < self.relevant_distance_min:
                 continue
 
             # first, correctly orient the sensor zero to the robot zero
             angle = angle + self.sensor_mounting_angle
-
             if angle >= 360.0:
                 angle = angle - 360.0
             elif angle < 0.0:
@@ -120,6 +109,8 @@ class OMPath(Node):
             x = d_m * math.cos(a_rad)
             y = d_m * math.sin(a_rad)
 
+            angle = angle - 180.0
+
             # the final data ready to use for path planning
             complexes.append([x, y, angle, d_m])
 
@@ -127,6 +118,7 @@ class OMPath(Node):
             for p in self.obstacle.points:
                 x = float(p.x)
                 y = float(p.y)
+
                 angle, distance = self.calculate_angle_and_distance(x, y)
                 complexes.append([x, y, angle, distance])
 

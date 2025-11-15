@@ -122,8 +122,6 @@ class LocalTraversability(Node):
     3. Classify hazardous cells as:
        - steep slopes (high gradient),
        - local steps / holes (big height jump in 3x3),
-       - “cliff-like” unknown zones (known → unknown along robot rays,
-         and with known cells to the left and right).
     4. Publish:
        - nav_msgs/OccupancyGrid for visualization / debugging,
        - hazard point clouds (PointCloud + PointCloud2) for the path selector.
@@ -165,12 +163,9 @@ class LocalTraversability(Node):
         # Hazard inflation radius: extra safety margin around hazards
         self.hazard_inflation_radius_m = 0.0
         # Hazard outputs
-        self.hazard_points_topic = "/traversability/hazard_points"
+
         self.hazard_points_frame = (
             "laser"  # hazard points expressed in this frame (for om_path)
-        )
-        self.hazard_include_unknown = (
-            False  # whether to treat unknown as hazard in the cloud
         )
         self.hazard_thinning_stride = 1  # 1 => keep every cell, >1 => sub-sample
         self.hazard_points_topic_pc2 = "/traversability/hazard_points2"
@@ -207,7 +202,7 @@ class LocalTraversability(Node):
         )
 
         self.get_logger().info(
-            f"LocalTraversability started. Hazards -> {self.hazard_points_topic} "
+            f"LocalTraversability started. Hazards -> {self.hazard_points_topic_pc2} "
             f"({self.hazard_points_frame})"
         )
 
@@ -263,7 +258,6 @@ class LocalTraversability(Node):
         5. Compute:
            - slope-based hazards (large sloped regions),
            - local step/hole hazards (3x3 height relief),
-           - unknown-area hazards (laser-style "cliff" logic).
         6. Merge hazards, filter small blobs, optionally inflate.
         7. Publish OccupancyGrid and hazard point clouds.
 
@@ -365,7 +359,6 @@ class LocalTraversability(Node):
         height_map = mean_z.reshape(grid_height, grid_width)
 
         known_mask = ~np.isnan(height_map)
-        unknown_mask = np.isnan(height_map)
 
         # Gradients / slope on the height map
         dz_dx = np.full_like(height_map, np.nan, dtype=np.float32)
@@ -412,101 +405,8 @@ class LocalTraversability(Node):
             local_relief[known_mask] > self.local_relief_step_thresh_m
         )
 
-        # Unknown hazards: "cliff" style using rays + left/right known neighbors -----
-
-        # Compute cell centers in map_frame, then to robot frame
-        xs = origin_x + (np.arange(grid_width, dtype=np.float32) + 0.5) * res
-        ys = origin_y + (np.arange(grid_height, dtype=np.float32) + 0.5) * res
-        Xg, Yg = np.meshgrid(xs, ys)  # grid cell centers in map_frame
-
-        dxg = Xg - bl_x
-        dyg = Yg - bl_y
-        Xr_g = cos_neg_yaw * dxg - sin_neg_yaw * dyg  # forward axis in robot frame
-        Yr_g = sin_neg_yaw * dxg + cos_neg_yaw * dyg  # left axis in robot frame
-
-        Rg = np.hypot(Xr_g, Yr_g)  # distance from robot
-        Ang = np.arctan2(Yr_g, Xr_g)  # bearing relative to robot forward
-        front_mask = Xr_g > 0.0  # only consider front half-plane
-
-        # Flatten everything to 1D, so we can do ray-wise processing
-        R_flat = Rg.ravel()
-        theta_flat = Ang.ravel()
-        known_flat = known_mask.ravel()
-        unknown_flat = unknown_mask.ravel()
-        front_flat = front_mask.ravel()
-
-        # Discretize angle into bins (here 180 bins => ~2° per bin)
-        N_THETA_BINS = 180
-        theta_idx_flat = (
-            (theta_flat + math.pi) / (2.0 * math.pi) * N_THETA_BINS
-        ).astype(np.int32)
-
-        # along each ray, look from near to far for "known -> unknown"
-        unknown_candidate_flat = np.zeros_like(unknown_flat, dtype=bool)
-
-        for b in range(N_THETA_BINS):
-            mask_b = (theta_idx_flat == b) & front_flat
-            if not np.any(mask_b):
-                continue
-
-            idx_b = np.where(mask_b)[0]
-            order_b = idx_b[np.argsort(R_flat[idx_b])]  # sort by radius
-
-            seen_known = False
-            for j in order_b:
-                r = R_flat[j]
-                if r > self.max_forward_range_m + 0.1:
-                    continue
-
-                if known_flat[j]:
-                    seen_known = True
-                elif unknown_flat[j] and seen_known:
-                    # First unknown cell after having seen at least one known along this ray.
-                    unknown_candidate_flat[j] = True
-
-        unknown_candidate = unknown_candidate_flat.reshape(grid_height, grid_width)
-
-        # require both left and right neighbors (in angle space) to have known cells
-        mask_known_front = front_flat & known_flat
-        R_known = R_flat[mask_known_front]
-        theta_known_idx = theta_idx_flat[mask_known_front]
-
-        mask_cand_front = front_flat & unknown_candidate_flat
-        cand_indices = np.where(mask_cand_front)[0]
-        R_cand = R_flat[cand_indices]
-        theta_cand_idx = theta_idx_flat[cand_indices]
-
-        unknown_haz_flat = np.zeros_like(unknown_flat, dtype=bool)
-
-        # Neighborhood thresholds in angle and radius
-        ANG_NEI = 4  # +/- 4 bins ≈ +/- 8 degrees
-        DR = 0.30  # +/- 0.30 m in radius
-
-        for k, idx in enumerate(cand_indices):
-            t = theta_cand_idx[k]
-            r0 = R_cand[k]
-
-            if R_known.size == 0:
-                continue
-
-            d_ang = (
-                theta_known_idx - t
-            )  # positive => on the right; negative => on the left
-
-            left_ok = np.any(
-                (d_ang < 0) & (d_ang >= -ANG_NEI) & (np.abs(R_known - r0) <= DR)
-            )
-            right_ok = np.any(
-                (d_ang > 0) & (d_ang <= ANG_NEI) & (np.abs(R_known - r0) <= DR)
-            )
-
-            if left_ok and right_ok:
-                unknown_haz_flat[idx] = True
-
-        unknown_hazard = unknown_haz_flat.reshape(grid_height, grid_width)
-
         # ombine hazards from all sources
-        hazard = step_hazard | haz_slope_down | haz_slope_mag | unknown_hazard
+        hazard = step_hazard | haz_slope_down | haz_slope_mag
 
         # De-speckle: keep only blobs with area >= (min_hazard_blob_side_m)^2
         structure = np.ones((3, 3), dtype=bool)  # 8-connected components
@@ -550,8 +450,6 @@ class LocalTraversability(Node):
 
         # Hazard point clouds (for om_path)
         haz_mask = np.array(hazard, dtype=bool)
-        if self.hazard_include_unknown:
-            haz_mask |= occ < 0
 
         # Thin points by stride if desired
         if self.hazard_thinning_stride > 1:

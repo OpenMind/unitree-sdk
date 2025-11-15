@@ -7,7 +7,7 @@ from ..models.data_models import MapInfo
 
 class MapManager:
     """
-    Manages map operations including saving, listing, and deleting maps.    
+    Manages map operations including saving, listing, and deleting maps.
     """
 
     def __init__(self, maps_directory: str, robot_type: str, logger=None):

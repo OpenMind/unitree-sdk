@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import rclpy
 import tf_transformations
-from geometry_msgs.msg import Point, Pose, PoseWithCovarianceStamped, TransformStamped
+from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy

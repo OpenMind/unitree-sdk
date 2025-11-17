@@ -21,7 +21,8 @@ from std_msgs.msg import Header
 
 
 def tf_to_matrix(tf: geometry_msgs.msg.TransformStamped) -> np.ndarray:
-    """Convert a ROS2 TransformStamped into a 4x4 homogeneous transform matrix.
+    """
+    Convert a ROS2 TransformStamped into a 4x4 homogeneous transform matrix.
 
     Parameters
     ----------
@@ -63,7 +64,8 @@ def tf_to_matrix(tf: geometry_msgs.msg.TransformStamped) -> np.ndarray:
 
 
 def quat2euler(x: float, y: float, z: float, w: float) -> tuple[float, float, float]:
-    """Convert quaternion to roll, pitch, yaw (in radians).
+    """
+    Convert quaternion to roll, pitch, yaw (in radians).
 
     Parameters
     ----------
@@ -89,7 +91,8 @@ def quat2euler(x: float, y: float, z: float, w: float) -> tuple[float, float, fl
 
 
 def euler_to_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
-    """Build a 3x3 rotation matrix from roll, pitch, yaw.
+    """
+    Build a 3x3 rotation matrix from roll, pitch, yaw.
 
     Parameters
     ----------
@@ -111,7 +114,8 @@ def euler_to_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
 
 
 class LocalTraversability(Node):
-    """Build a local traversability grid directly from depth point clouds.
+    """
+    Build a local traversability grid directly from depth point clouds.
 
     High-level behavior
     -------------------
@@ -205,7 +209,8 @@ class LocalTraversability(Node):
         )
 
     def _publish_hazard_cloud2(self, xyz: np.ndarray, frame_id: str) -> None:
-        """Publish a PointCloud2 of hazard cell centers.
+        """
+        Publish a PointCloud2 of hazard cell centers.
 
         Parameters
         ----------
@@ -221,7 +226,8 @@ class LocalTraversability(Node):
         self.hazard_pub_pc2.publish(msg)
 
     def pc2_call_back(self, msg: PointCloud2) -> None:
-        """Callback for incoming depth PointCloud2.
+        """
+        Callback for incoming depth PointCloud2.
 
         Reads (x, y, z) points, converts them to numpy, and runs the
         traversability pipeline.
@@ -245,7 +251,8 @@ class LocalTraversability(Node):
         self._run_pipeline(pts, src_frame)
 
     def _run_pipeline(self, pts_src: np.ndarray, src_frame: str) -> None:
-        """Full traversability computation pipeline.
+        """
+        Full traversability computation pipeline.
 
         Steps
         -----

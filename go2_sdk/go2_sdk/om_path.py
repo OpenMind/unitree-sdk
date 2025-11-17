@@ -12,7 +12,9 @@ from om_api.msg import Paths
 
 
 def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=10):
-    """Create a straight line path from origin at specified angle and length"""
+    """
+    Create a straight line path from origin at specified angle and length
+    """
     angle_rad = math.radians(angle_degrees)
     end_x = length * math.cos(angle_rad)  # +X forward
     end_y = length * math.sin(angle_rad)  # +Y left
@@ -31,7 +33,8 @@ paths = [create_straight_line_path_from_angle(a, path_length) for a in path_angl
 
 
 class OMPath(Node):
-    """Fuse LaserScan, depth obstacles, and hazard PC2 to choose feasible paths.
+    """
+    Fuse LaserScan, depth obstacles, and hazard PC2 to choose feasible paths.
 
     Notes
     -----
@@ -211,11 +214,15 @@ class OMPath(Node):
         )
 
     def obstacle_callback(self, msg: PointCloud):
-        """Store depth-obstacle PointCloud (assumed already in robot frame)."""
+        """
+        Store depth-obstacle PointCloud (assumed already in robot frame).
+        """
         self.obstacle = msg
 
     def _rot_array_deg(self, arr_xy: np.ndarray, yaw_deg: float) -> np.ndarray:
-        """Rotate Nx2 [x,y] points by yaw_deg (degrees, +CCW)."""
+        """
+        Rotate Nx2 [x,y] points by yaw_deg.
+        """
         if arr_xy.size == 0:
             return arr_xy
         r = math.radians(yaw_deg)
@@ -227,7 +234,9 @@ class OMPath(Node):
         return np.stack([xr, yr], axis=1)
 
     def hazard_callback_pc2(self, msg: PointCloud2):
-        """Read hazard PC2 (x,y), rotate from LASER to robot frame, store as Nx2."""
+        """
+        Read hazard PC2 (x,y), rotate from LASER to robot frame, store as Nx2.
+        """
         try:
             arr = pc2.read_points_numpy(msg, field_names=("x", "y"), skip_nans=True)
             arr = np.asarray(arr, dtype=np.float32).reshape(-1, 2)
@@ -236,14 +245,18 @@ class OMPath(Node):
             self.get_logger().warn(f"Failed to parse hazard_points2: {e}")
 
     def calculate_angle_and_distance(self, world_x, world_y):
-        """Return (angle_degrees, distance) from x,y in robot frame."""
+        """
+        Return (angle_degrees, distance) from x,y in robot frame.
+        """
         distance = math.sqrt(world_x**2 + world_y**2)
         angle_rad = math.atan2(world_y, world_x)
         angle_degrees = math.degrees(angle_rad)
         return angle_degrees, distance
 
     def distance_point_to_line_segment(self, px, py, x1, y1, x2, y2):
-        """Distance from (px,py) to segment (x1,y1)-(x2,y2)."""
+        """
+        Distance from (px,py) to segment (x1,y1)-(x2,y2).
+        """
         # Vector from line start to line end
         dx = x2 - x1
         dy = y2 - y1
@@ -268,7 +281,9 @@ class OMPath(Node):
     def _publish_markers(
         self, possible_paths, bad_paths, obstacles_xy, hazards_xy, frame_id, stamp
     ):
-        """Publish RViz markers for candidate paths, obstacles, and hazards."""
+        """
+        Publish RViz markers for candidate paths, obstacles, and hazards.
+        """
         ma = MarkerArray()
 
         wipe = Marker()

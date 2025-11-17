@@ -322,7 +322,7 @@ class LocalTraversability(Node):
         y_world = y_world[roi_mask]
         z_world = z_world[roi_mask]
 
-        # ----- Local grid geometry: 5 m x 5 m centered on base_link -----
+        # Local grid geometry: 5 m x 5 m centered on base_link
         grid_size_m = self.local_grid_size_m
         res = self.local_grid_resolution_m
         grid_width = int(math.ceil(grid_size_m / res))
@@ -344,7 +344,7 @@ class LocalTraversability(Node):
             return
         col, row, z_world = col[in_bounds], row[in_bounds], z_world[in_bounds]
 
-        # ----- Build height map: mean z per cell -----
+        # Build height map: mean z per cell
         height_map = np.full((grid_height, grid_width), np.nan, dtype=np.float32)
         lin_idx = row * grid_width + col
         sum_z = np.zeros(grid_height * grid_width, dtype=np.float32)
@@ -389,7 +389,7 @@ class LocalTraversability(Node):
             slope_mag_deg > self.max_allowed_slope_deg
         )
 
-        # Local height relief: 3x3 window; big delta -> step/hole hazard -----
+        # Local height relief: 3x3 window; big delta -> step/hole hazard
         h_for_max = np.nan_to_num(height_map, nan=-np.inf)
         h_for_min = np.nan_to_num(height_map, nan=+np.inf)
         local_max = maximum_filter(h_for_max, size=3)

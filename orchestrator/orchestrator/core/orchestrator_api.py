@@ -10,6 +10,8 @@ from om_api.msg import (
     OMAIRequest,
     OMAPIRequest,
     OMAPIResponse,
+    OMAvatarFaceReponse,
+    OMAvatarFaceRequest,
     OMModeReponse,
     OMModeRequest,
     OMTTSReponse,
@@ -77,6 +79,9 @@ class OrchestratorAPI(Node):
         self.mode_request_pub = self.create_publisher(
             OMModeRequest, "/om/mode/request", 10
         )
+        self.avatar_request_pub = self.create_publisher(
+            OMAvatarFaceRequest, "/om/avatar/request", 10
+        )
         self.tts_request_pub = self.create_publisher(
             OMTTSRequest, "/om/tts/request", 10
         )
@@ -99,6 +104,12 @@ class OrchestratorAPI(Node):
             OMModeReponse,
             "/om/mode/response",
             self.ros_handlers.mode_response_callback,
+            10,
+        )
+        self.avatar_response_sub = self.create_subscription(
+            OMAvatarFaceReponse,
+            "/om/avatar/response",
+            self.ros_handlers.avatar_response_callback,
             10,
         )
         self.tts_request_sub = self.create_subscription(

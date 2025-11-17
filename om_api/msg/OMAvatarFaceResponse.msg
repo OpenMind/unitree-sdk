@@ -1,3 +1,3 @@
 std_msgs/Header header
-int8 code
+string request_id
 string message

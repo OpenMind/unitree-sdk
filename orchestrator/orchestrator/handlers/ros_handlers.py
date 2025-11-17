@@ -206,6 +206,10 @@ class ROSHandlers:
             elif action in ["get_mode", "switch_mode"]:
                 self._handle_mode_request(action, msg)
 
+            # Handle avatar-healthcheck actions
+            elif action in ["get_avatar_status"]:
+                self._handle_avatar_request(action, msg)
+
             # Handle TTS-related actions
             elif action in ["tts_status", "enable_tts", "disable_tts"]:
                 self._handle_tts_request(action, msg)
@@ -338,6 +342,54 @@ class ROSHandlers:
                 500,
                 "error",
                 f"Failed to publish mode request: {str(e)}",
+            )
+
+    def _handle_avatar_request(self, action: str, msg):
+        """
+        Handle avatar-related requests.
+
+        Parameters:
+        -----------
+        action : str
+            The health check action to perform on avatar.
+        msg : OMAPIRequest
+            The original API request message.
+        """
+        action_codes = {"get_avatar_status": 1} 
+
+        if action not in action_codes:
+            self._publish_api_response(
+                msg.request_id, 400, "error", f"Unknown avatar action: {action}"
+            )
+            return
+
+        self.orchestrator.get_logger().info(f"Received request for {action}")
+
+        if not hasattr(self.orchestrator, "avatar_request_pub"):
+            self._publish_api_response(
+                msg.request_id, 500, "error", "Avatar request publisher not available"
+            )
+            return
+
+        try:
+            avatar_request_msg = OMAvatarFaceRequest()
+            avatar_request_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+            avatar_request_msg.header.frame_id = "om_api"
+            avatar_request_msg.request_id = msg.request_id
+            avatar_request_msg.face_text = "health_check"
+
+            self.orchestrator.avatar_request_pub.publish(avatar_request_msg)
+            self.orchestrator.get_logger().info(f"Published avatar request: {action}")
+
+        except Exception as e:
+            self.orchestrator.get_logger().error(
+                f"Failed to publish avatar request: {str(e)}"
+            )
+            self._publish_api_response(
+                msg.request_id,
+                500,
+                "error",
+                f"Failed to publish avatar request: {str(e)}",
             )
 
     def _handle_tts_request(self, action: str, msg):
@@ -615,14 +667,14 @@ class ROSHandlers:
                     f"Failed to broadcast ASR text: {e}"
                 )
 
-    def avatar_face_callback(self, msg: OMAvatarFaceRequest):
+    def avatar_request_callback(self, msg: OMAvatarFaceRequest):
         """
-        Callback function for avatar face messages to broadcast to frontend.
+        Callback function for avatar request messages to broadcast to frontend.
 
         Parameters:
         -----------
         msg : OMAvatarFaceRequest
-            The incoming avatar face request message.
+            The incoming avatar request message.
         """
         if not hasattr(self.orchestrator, "cloud_connection_manager"):
             self.orchestrator.get_logger().warning(
@@ -649,6 +701,30 @@ class ROSHandlers:
                 self.orchestrator.get_logger().error(
                     f"Failed to broadcast avatar face: {e}"
                 )
+
+    def avatar_response_callback(self, msg):
+        """
+        Callback for avatar response messages.
+
+        Parameters:
+        ----------
+        msg : OMAvatarFaceReponse
+            The received avatar response message.
+        """
+        if not hasattr(self.orchestrator, "api_response_pub"):
+            self.orchestrator.get_logger().warning(
+                "API response publisher not available"
+            )
+            return
+
+        response_msg = OMAPIResponse()
+        response_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+        response_msg.request_id = msg.request_id
+        response_msg.code = 0
+        response_msg.status = "active"
+        response_msg.message = msg.message
+
+        self.orchestrator.api_response_pub.publish(response_msg)
 
     def cloud_api_response_callback(self, response):
         """

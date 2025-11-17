@@ -13,9 +13,9 @@ from om_api.msg import Paths
 
 def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=10):
     """Create a straight line path from origin at specified angle and length"""
-    a = math.radians(angle_degrees)
-    end_x = length * math.cos(a)  # +X forward
-    end_y = length * math.sin(a)  # +Y left
+    angle_rad = math.radians(angle_degrees)
+    end_x = length * math.cos(angle_rad)  # +X forward
+    end_y = length * math.sin(angle_rad)  # +Y left
 
     x_vals = np.linspace(0.0, end_x, num_points)
     y_vals = np.linspace(0.0, end_y, num_points)
@@ -69,7 +69,7 @@ class OMPath(Node):
         self.paths_pub = self.create_publisher(Paths, "/om/paths", 10)
         self.markers_pub = self.create_publisher(MarkerArray, "/om/paths_markers", 10)
 
-        self.get_logger().info("OMPath node started (with hazard PC2 support)")
+        self.get_logger().info("OMPath node started")
 
     def scan_callback(self, msg: LaserScan):
         self.scan = msg
@@ -169,7 +169,6 @@ class OMPath(Node):
                     possible_paths = np.setdiff1d(possible_paths, path_to_remove)
                     break
 
-        # Hazard-based blocking (unchanged v2 logic)
         if self.hazard_xy_robot.size > 0 and possible_paths.size > 0:
             for hx, hy in self.hazard_xy_robot:
                 for apath in possible_paths.copy():
@@ -196,10 +195,8 @@ class OMPath(Node):
         paths_msg.header.frame_id = self.laser_frame
         paths_msg.paths = possible_paths.tolist()
 
-        if hasattr(paths_msg, "blocked_by_obstacle_idx"):
-            paths_msg.blocked_by_obstacle_idx = blocked_by_obstacle_idx
-        if hasattr(paths_msg, "blocked_by_hazard_idx"):
-            paths_msg.blocked_by_hazard_idx = blocked_by_hazard_idx
+        paths_msg.blocked_by_obstacle_idx = blocked_by_obstacle_idx
+        paths_msg.blocked_by_hazard_idx = blocked_by_hazard_idx
 
         self.paths_pub.publish(paths_msg)
 

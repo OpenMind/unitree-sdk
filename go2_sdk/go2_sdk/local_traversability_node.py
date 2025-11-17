@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import math
 
+import geometry_msgs.msg
 import numpy as np
 import rclpy
 import tf2_ros
@@ -22,7 +20,7 @@ from sensor_msgs_py import point_cloud2 as pc2
 from std_msgs.msg import Header
 
 
-def tf_to_matrix(tf):
+def tf_to_matrix(tf: geometry_msgs.msg.TransformStamped) -> np.ndarray:
     """Convert a ROS2 TransformStamped into a 4x4 homogeneous transform matrix.
 
     Parameters
@@ -64,7 +62,7 @@ def tf_to_matrix(tf):
     return T
 
 
-def quat2euler(x, y, z, w):
+def quat2euler(x: float, y: float, z: float, w: float) -> tuple[float, float, float]:
     """Convert quaternion to roll, pitch, yaw (in radians).
 
     Parameters
@@ -90,7 +88,7 @@ def quat2euler(x, y, z, w):
     return roll, pitch, yaw
 
 
-def euler_to_matrix(roll, pitch, yaw):
+def euler_to_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
     """Build a 3x3 rotation matrix from roll, pitch, yaw.
 
     Parameters
@@ -158,7 +156,7 @@ class LocalTraversability(Node):
 
         # Minimum size of a connected hazardous blob (remove tiny speckles)
         # Any connected hazard region smaller than [min_hazard_blob_side_m]^2 is removed.
-        self.min_hazard_blob_side_m = 0.30  # 30 cm x 30 cm blob minimum
+        self.min_hazard_blob_side_m = 0.20  # 30 cm x 30 cm blob minimum
 
         # Hazard inflation radius: extra safety margin around hazards
         self.hazard_inflation_radius_m = 0.0
@@ -405,7 +403,7 @@ class LocalTraversability(Node):
             local_relief[known_mask] > self.local_relief_step_thresh_m
         )
 
-        # ombine hazards from all sources
+        # Combine hazards from all sources
         hazard = step_hazard | haz_slope_down | haz_slope_mag
 
         # De-speckle: keep only blobs with area >= (min_hazard_blob_side_m)^2
@@ -486,7 +484,6 @@ class LocalTraversability(Node):
         pts_grid = np.vstack([xg, yg, zg, np.ones_like(xg)]).astype(np.float32)
         pts_out = (T_out @ pts_grid).T[:, :3]
 
-        points = [Point32(x=float(p[0]), y=float(p[1]), z=float(p[2])) for p in pts_out]
         self._publish_hazard_cloud2(
             pts_out.astype(np.float32), self.hazard_points_frame
         )

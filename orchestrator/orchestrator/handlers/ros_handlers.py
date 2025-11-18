@@ -60,7 +60,7 @@ class ROSHandlers:
 
         Parameters:
         ----------
-        msg : OMAIReponse
+        msg : OMAIResponse
             The received AI response message.
         """
         if not hasattr(self.orchestrator, "api_response_pub"):
@@ -84,7 +84,7 @@ class ROSHandlers:
 
         Parameters:
         ----------
-        msg : OMModeReponse
+        msg : OMModeResponse
             The received mode response message.
         """
         if not hasattr(self.orchestrator, "api_response_pub"):
@@ -108,7 +108,7 @@ class ROSHandlers:
 
         Parameters:
         ----------
-        msg : OMTTSReponse
+        msg : OMTTSResponse
             The received TTS response message.
         """
         if not hasattr(self.orchestrator, "api_response_pub"):
@@ -709,7 +709,7 @@ class ROSHandlers:
 
         Parameters:
         ----------
-        msg : OMAvatarFaceReponse
+        msg : OMAvatarFaceResponse
             The received avatar response message.
         """
         if not hasattr(self.orchestrator, "api_response_pub"):

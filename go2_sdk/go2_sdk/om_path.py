@@ -342,12 +342,11 @@ class OMPath(Node):
         All inputs (paths, obstacles, hazards) are in ROBOT frame.
         """
         ma = MarkerArray()
-        stamp_zero = Time().to_msg()
-        # stamp_zero = Time().to_msg()
+        msg_time_stamp = Time().to_msg()
 
         wipe = Marker()
         wipe.header.frame_id = frame_id
-        wipe.header.stamp = stamp_zero
+        wipe.header.stamp = msg_time_stamp
         wipe.action = Marker.DELETEALL
         ma.markers.append(wipe)
 
@@ -355,7 +354,7 @@ class OMPath(Node):
         for idx, path_arr in enumerate(paths):
             line = Marker()
             line.header.frame_id = frame_id
-            line.header.stamp = stamp_zero
+            line.header.stamp = msg_time_stamp
             line.ns = "candidate_paths"
             line.id = idx
             line.type = Marker.LINE_STRIP
@@ -390,7 +389,7 @@ class OMPath(Node):
 
             t = Marker()
             t.header.frame_id = frame_id
-            t.header.stamp = stamp_zero
+            t.header.stamp = msg_time_stamp
             t.ns = "path_labels"
             t.id = 1000 + idx
             t.type = Marker.TEXT_VIEW_FACING
@@ -409,7 +408,7 @@ class OMPath(Node):
         if obstacles_xy:
             pts = Marker()
             pts.header.frame_id = frame_id
-            pts.header.stamp = stamp_zero
+            pts.header.stamp = msg_time_stamp
             pts.ns = "obstacles"
             pts.id = 2000
             pts.type = Marker.POINTS
@@ -424,7 +423,7 @@ class OMPath(Node):
         if hazards_xy:
             h = Marker()
             h.header.frame_id = frame_id
-            h.header.stamp = stamp_zero
+            h.header.stamp = msg_time_stamp
             h.ns = "hazards"
             h.id = 3000
             h.type = Marker.POINTS

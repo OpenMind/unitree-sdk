@@ -156,11 +156,11 @@ class LocalTraversability(Node):
         self.slope_baseline_cells = 3  # use 3 cells (~15 cm) as baseline spacing
 
         # Local height discontinuity (steps / stairs / holes) in a 3x3 neighborhood
-        self.local_relief_step_thresh_m = 0.08  # > 8 cm height difference => hazard
+        self.local_relief_step_thresh_m = 0.12  # > 8 cm height difference => hazard
 
         # Minimum size of a connected hazardous blob (remove tiny speckles)
         # Any connected hazard region smaller than [min_hazard_blob_side_m]^2 is removed.
-        self.min_hazard_blob_side_m = 0.20  # 30 cm x 30 cm blob minimum
+        self.min_hazard_blob_side_m = 0.30  # 30 cm x 30 cm blob minimum
 
         # Hazard inflation radius: extra safety margin around hazards
         self.hazard_inflation_radius_m = 0.0

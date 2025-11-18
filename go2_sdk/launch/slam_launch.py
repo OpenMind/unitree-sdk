@@ -99,7 +99,7 @@ def generate_launch_description():
                 name="static_transform_publisher_laser",
                 arguments=[
                     "--x",
-                    "0.2",
+                    "0",
                     "--y",
                     "0",
                     "--z",

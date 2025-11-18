@@ -154,7 +154,7 @@ def generate_launch_description():
                 name="static_transform_publisher_camera",
                 arguments=[
                     "--x",
-                    "0.2",
+                    "0",
                     "--y",
                     "0",
                     "--z",

@@ -51,7 +51,7 @@ class OMPath(Node):
         super().__init__("om_path")
 
         self.half_width_robot = 0.20
-        self.sensor_mounting_angle = 172.0
+        self.sensor_mounting_angle = 180.0
         self.relevant_distance_min = 0.20
         self.obstacle_threshold = 0.50  # 50 data points
         self.robot_frame = "base_link"
@@ -219,48 +219,61 @@ class OMPath(Node):
             stamp=paths_msg.header.stamp,
         )
 
-    def obstacle_callback(self, msg: PointCloud):
+    def obstacle_callback(self, obstacle_cloud_msg: PointCloud):
         """
-        Store depth-obstacle PointCloud (assumed already in robot frame).
+        Receive depth-based obstacle points in the camera frame and transform them
+        into the robot frame (self.robot_frame). The result is stored in
+        self.obstacle as a PointCloud in robot frame.
         """
+        source_frame = (
+            obstacle_cloud_msg.header.frame_id
+        )  # e.g. "camera_depth_optical_frame"
+        target_frame = self.robot_frame  # e.g. "base_link"
+
         try:
-            # target = robot_frame, source = camera optical frame
-            transform = self.tf_buffer.lookup_transform(
-                self.robot_frame,
-                msg.header.frame_id,  # "camera_depth_optical_frame"
-                Time(),
+            transform_camera_to_robot = self.tf_buffer.lookup_transform(
+                target_frame,
+                source_frame,
+                Time.from_msg(obstacle_cloud_msg.header.stamp),
             )
         except Exception as ex:
             self.get_logger().warn(
-                f"TF lookup failed for depth obstacles {msg.header.frame_id} -> {self.robot_frame}: {ex}"
+                f"TF lookup failed for depth obstacles {source_frame} -> {target_frame}: {ex}"
             )
             return
 
-        pc_robot = PointCloud()
-        pc_robot.header.stamp = msg.header.stamp
-        pc_robot.header.frame_id = self.robot_frame
-        pc_robot.points = []
+        # PointCloud expressed in robot frame
+        obstacle_cloud_robot_frame = PointCloud()
+        obstacle_cloud_robot_frame.header.stamp = obstacle_cloud_msg.header.stamp
+        obstacle_cloud_robot_frame.header.frame_id = target_frame
+        obstacle_cloud_robot_frame.points = []
 
-        for p in msg.points:
-            ps = PointStamped()
-            ps.header = msg.header
-            ps.point.x = float(p.x)
-            ps.point.y = float(p.y)
-            ps.point.z = float(p.z)
+        point_in_source_frame = PointStamped()
+        point_in_source_frame.header = obstacle_cloud_msg.header
+
+        for point in obstacle_cloud_msg.points:
+            # Fill input point (camera frame)
+            point_in_source_frame.point.x = float(point.x)
+            point_in_source_frame.point.y = float(point.y)
+            point_in_source_frame.point.z = float(point.z)
 
             try:
-                pr = do_transform_point(ps, transform)
-            except Exception as e:
-                self.get_logger().warn(f"Failed to transform depth point: {e}")
+                point_in_robot_frame = do_transform_point(
+                    point_in_source_frame, transform_camera_to_robot
+                )
+            except Exception as ex:
+                self.get_logger().warn(f"Failed to transform depth point: {ex}")
                 continue
 
-            q = Point()
-            q.x = pr.point.x
-            q.y = pr.point.y
-            q.z = pr.point.z
-            pc_robot.points.append(q)
+            transformed_point = Point()
+            transformed_point.x = point_in_robot_frame.point.x
+            transformed_point.y = point_in_robot_frame.point.y
+            transformed_point.z = point_in_robot_frame.point.z
 
-        self.obstacle = pc_robot
+            obstacle_cloud_robot_frame.points.append(transformed_point)
+
+        # Store the transformed cloud for later use in scan_callback
+        self.obstacle = obstacle_cloud_robot_frame
 
     def _rot_array_deg(self, arr_xy: np.ndarray, yaw_deg: float) -> np.ndarray:
         """
@@ -329,10 +342,12 @@ class OMPath(Node):
         All inputs (paths, obstacles, hazards) are in ROBOT frame.
         """
         ma = MarkerArray()
+        stamp_zero = Time().to_msg()
+        # stamp_zero = Time().to_msg()
 
         wipe = Marker()
         wipe.header.frame_id = frame_id
-        wipe.header.stamp = stamp
+        wipe.header.stamp = stamp_zero
         wipe.action = Marker.DELETEALL
         ma.markers.append(wipe)
 
@@ -340,7 +355,7 @@ class OMPath(Node):
         for idx, path_arr in enumerate(paths):
             line = Marker()
             line.header.frame_id = frame_id
-            line.header.stamp = stamp
+            line.header.stamp = stamp_zero
             line.ns = "candidate_paths"
             line.id = idx
             line.type = Marker.LINE_STRIP
@@ -375,7 +390,7 @@ class OMPath(Node):
 
             t = Marker()
             t.header.frame_id = frame_id
-            t.header.stamp = stamp
+            t.header.stamp = stamp_zero
             t.ns = "path_labels"
             t.id = 1000 + idx
             t.type = Marker.TEXT_VIEW_FACING
@@ -394,7 +409,7 @@ class OMPath(Node):
         if obstacles_xy:
             pts = Marker()
             pts.header.frame_id = frame_id
-            pts.header.stamp = stamp
+            pts.header.stamp = stamp_zero
             pts.ns = "obstacles"
             pts.id = 2000
             pts.type = Marker.POINTS
@@ -409,7 +424,7 @@ class OMPath(Node):
         if hazards_xy:
             h = Marker()
             h.header.frame_id = frame_id
-            h.header.stamp = stamp
+            h.header.stamp = stamp_zero
             h.ns = "hazards"
             h.id = 3000
             h.type = Marker.POINTS

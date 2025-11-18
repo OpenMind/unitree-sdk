@@ -363,7 +363,7 @@ class ROSHandlers:
             )
             return
 
-        self.orchestrator.get_logger().info(f"Received request for {action}")
+        self.orchestrator.get_logger().debug(f"Received request for {action}")
 
         if not hasattr(self.orchestrator, "avatar_request_pub"):
             self._publish_api_response(
@@ -378,11 +378,11 @@ class ROSHandlers:
             )
             avatar_request_msg.header.frame_id = "om_api"
             avatar_request_msg.request_id = msg.request_id
-            avatar_request_msg.code = 0
+            avatar_request_msg.code = 1  
             avatar_request_msg.face_text = ""
 
             self.orchestrator.avatar_request_pub.publish(avatar_request_msg)
-            self.orchestrator.get_logger().info(
+            self.orchestrator.get_logger().debug(
                 f"Published avatar health check request"
             )
 
@@ -685,6 +685,9 @@ class ROSHandlers:
             self.orchestrator.get_logger().warning(
                 "Cloud connection manager not available"
             )
+            return
+
+        if msg.code != 0:
             return
 
         # Broadcast avatar face to WebSocket clients

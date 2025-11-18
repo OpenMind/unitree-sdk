@@ -378,7 +378,7 @@ class ROSHandlers:
             )
             avatar_request_msg.header.frame_id = "om_api"
             avatar_request_msg.request_id = msg.request_id
-            avatar_request_msg.code = 1  
+            avatar_request_msg.code = 1
             avatar_request_msg.face_text = ""
 
             self.orchestrator.avatar_request_pub.publish(avatar_request_msg)

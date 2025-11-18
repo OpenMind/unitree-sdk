@@ -6,15 +6,15 @@ from rclpy.node import Node
 
 from om_api.msg import (
     MapStorage,
-    OMAIResponse,
+    OMAIReponse,
     OMAIRequest,
     OMAPIRequest,
     OMAPIResponse,
     OMAvatarFaceResponse,
     OMAvatarFaceRequest,
-    OMModeResponse,
+    OMModeReponse,
     OMModeRequest,
-    OMTTSResponse,
+    OMTTSReponse,
     OMTTSRequest,
 )
 from unitree_go.msg import LowState
@@ -98,10 +98,10 @@ class OrchestratorAPI(Node):
             OMAPIRequest, "/om/api/request", self.ros_handlers.api_request_callback, 10
         )
         self.ai_request_sub = self.create_subscription(
-            OMAIResponse, "/om/ai/response", self.ros_handlers.ai_response_callback, 10
+            OMAIReponse, "/om/ai/response", self.ros_handlers.ai_response_callback, 10
         )
         self.mode_request_sub = self.create_subscription(
-            OMModeResponse,
+            OMModeReponse,
             "/om/mode/response",
             self.ros_handlers.mode_response_callback,
             10,
@@ -113,7 +113,7 @@ class OrchestratorAPI(Node):
             10,
         )
         self.tts_request_sub = self.create_subscription(
-            OMTTSResponse,
+            OMTTSReponse,
             "/om/tts/response",
             self.ros_handlers.tts_response_callback,
             10,

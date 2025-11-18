@@ -355,7 +355,7 @@ class ROSHandlers:
         msg : OMAPIRequest
             The original API request message.
         """
-        action_codes = {"get_avatar_status": 1} 
+        action_codes = {"get_avatar_status": 1}
 
         if action not in action_codes:
             self._publish_api_response(
@@ -373,14 +373,18 @@ class ROSHandlers:
 
         try:
             avatar_request_msg = OMAvatarFaceRequest()
-            avatar_request_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+            avatar_request_msg.header.stamp = (
+                self.orchestrator.get_clock().now().to_msg()
+            )
             avatar_request_msg.header.frame_id = "om_api"
             avatar_request_msg.request_id = msg.request_id
-            avatar_request_msg.code = 0  
-            avatar_request_msg.face_text = "" 
+            avatar_request_msg.code = 0
+            avatar_request_msg.face_text = ""
 
             self.orchestrator.avatar_request_pub.publish(avatar_request_msg)
-            self.orchestrator.get_logger().info(f"Published avatar health check request")
+            self.orchestrator.get_logger().info(
+                f"Published avatar health check request"
+            )
 
         except Exception as e:
             self.orchestrator.get_logger().error(
@@ -721,16 +725,16 @@ class ROSHandlers:
         response_msg = OMAPIResponse()
         response_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
         response_msg.request_id = msg.request_id
-        
-        if msg.code == 0:  
+
+        if msg.code == 0:
             response_msg.code = 0
             response_msg.status = "active"
-        elif msg.code == 1: 
+        elif msg.code == 1:
             response_msg.code = 1
             response_msg.status = "error"
-        else:  
+        else:
             return
-        
+
         response_msg.message = msg.message
 
         self.orchestrator.api_response_pub.publish(response_msg)

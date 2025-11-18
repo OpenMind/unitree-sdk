@@ -29,6 +29,7 @@ RUN apt-get install -y \
     ros-humble-rosidl-typesupport-c \
     ros-humble-rosidl-typesupport-cpp \
     ros-humble-realsense2-camera \
+    ros-humble-depth-image-proc \
     libportaudio2 \
     x11-apps \
     libsm6 \

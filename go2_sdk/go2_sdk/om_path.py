@@ -5,6 +5,7 @@ import rclpy
 import tf2_ros
 from geometry_msgs.msg import Point, PointStamped
 from rclpy.node import Node
+from rclpy.time import Time
 from sensor_msgs.msg import LaserScan, PointCloud, PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
 from tf2_geometry_msgs import do_transform_point
@@ -53,7 +54,6 @@ class OMPath(Node):
         self.sensor_mounting_angle = 172.0
         self.relevant_distance_min = 0.20
         self.obstacle_threshold = 0.50  # 50 data points
-        self.laser_frame = "laser"
         self.robot_frame = "base_link"
 
         self.scan = None
@@ -215,7 +215,7 @@ class OMPath(Node):
             bad_paths=bad_union,
             obstacles_xy=list(zip(X.tolist(), Y.tolist())),
             hazards_xy=self.hazard_xy_robot.tolist(),
-            frame_id=self.robot_frame,  # 用 base_link
+            frame_id=self.robot_frame,
             stamp=paths_msg.header.stamp,
         )
 
@@ -224,11 +224,11 @@ class OMPath(Node):
         Store depth-obstacle PointCloud (assumed already in robot frame).
         """
         try:
-            # target = robot_frame, source = 相机光学坐标系
+            # target = robot_frame, source = camera optical frame
             transform = self.tf_buffer.lookup_transform(
                 self.robot_frame,
                 msg.header.frame_id,  # "camera_depth_optical_frame"
-                self.get_clock().now(),
+                Time(),
             )
         except Exception as ex:
             self.get_logger().warn(

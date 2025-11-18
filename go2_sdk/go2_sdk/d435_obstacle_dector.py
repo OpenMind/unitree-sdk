@@ -91,8 +91,8 @@ class D435ObstacleDector(Node):
         R_align = np.array(
             [
                 [0, 0, 1],  # Camera Z (forward) -> World X (forward)
-                [-1, 0, 0],  # Camera X (right)   -> World Y (left)
-                [0, -1, 0],  # Camera Y (down)    -> World Z (up)
+                [-1, 0, 0],  # Camera X (right)  -> World Y (left)
+                [0, -1, 0],  # Camera Y (down)   -> World Z (up)
             ]
         )
 

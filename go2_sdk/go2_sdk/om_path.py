@@ -2,10 +2,13 @@ import math
 
 import numpy as np
 import rclpy
-from geometry_msgs.msg import Point
+import tf2_ros
+from geometry_msgs.msg import Point, PointStamped
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan, PointCloud, PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
+from tf2_geometry_msgs import do_transform_point
+from tf2_ros import TransformException
 from visualization_msgs.msg import Marker, MarkerArray
 
 from om_api.msg import Paths
@@ -51,6 +54,7 @@ class OMPath(Node):
         self.relevant_distance_min = 0.20
         self.obstacle_threshold = 0.50  # 50 data points
         self.laser_frame = "laser"
+        self.robot_frame = "base_link"
 
         self.scan = None
         self.obstacle: PointCloud | None = None
@@ -71,6 +75,8 @@ class OMPath(Node):
 
         self.paths_pub = self.create_publisher(Paths, "/om/paths", 10)
         self.markers_pub = self.create_publisher(MarkerArray, "/om/paths_markers", 10)
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         self.get_logger().info("OMPath node started")
 
@@ -195,7 +201,7 @@ class OMPath(Node):
 
         paths_msg = Paths()
         paths_msg.header.stamp = self.get_clock().now().to_msg()
-        paths_msg.header.frame_id = self.laser_frame
+        paths_msg.header.frame_id = self.robot_frame
         paths_msg.paths = possible_paths.tolist()
 
         paths_msg.blocked_by_obstacle_idx = blocked_by_obstacle_idx
@@ -209,7 +215,7 @@ class OMPath(Node):
             bad_paths=bad_union,
             obstacles_xy=list(zip(X.tolist(), Y.tolist())),
             hazards_xy=self.hazard_xy_robot.tolist(),
-            frame_id=self.laser_frame,
+            frame_id=self.robot_frame,  # 用 base_link
             stamp=paths_msg.header.stamp,
         )
 
@@ -217,7 +223,44 @@ class OMPath(Node):
         """
         Store depth-obstacle PointCloud (assumed already in robot frame).
         """
-        self.obstacle = msg
+        try:
+            # target = robot_frame, source = 相机光学坐标系
+            transform = self.tf_buffer.lookup_transform(
+                self.robot_frame,
+                msg.header.frame_id,  # "camera_depth_optical_frame"
+                self.get_clock().now(),
+            )
+        except Exception as ex:
+            self.get_logger().warn(
+                f"TF lookup failed for depth obstacles {msg.header.frame_id} -> {self.robot_frame}: {ex}"
+            )
+            return
+
+        pc_robot = PointCloud()
+        pc_robot.header.stamp = msg.header.stamp
+        pc_robot.header.frame_id = self.robot_frame
+        pc_robot.points = []
+
+        for p in msg.points:
+            ps = PointStamped()
+            ps.header = msg.header
+            ps.point.x = float(p.x)
+            ps.point.y = float(p.y)
+            ps.point.z = float(p.z)
+
+            try:
+                pr = do_transform_point(ps, transform)
+            except Exception as e:
+                self.get_logger().warn(f"Failed to transform depth point: {e}")
+                continue
+
+            q = Point()
+            q.x = pr.point.x
+            q.y = pr.point.y
+            q.z = pr.point.z
+            pc_robot.points.append(q)
+
+        self.obstacle = pc_robot
 
     def _rot_array_deg(self, arr_xy: np.ndarray, yaw_deg: float) -> np.ndarray:
         """
@@ -240,7 +283,7 @@ class OMPath(Node):
         try:
             arr = pc2.read_points_numpy(msg, field_names=("x", "y"), skip_nans=True)
             arr = np.asarray(arr, dtype=np.float32).reshape(-1, 2)
-            self.hazard_xy_robot = self._rot_array_deg(arr, self.sensor_mounting_angle)
+            self.hazard_xy_robot = arr
         except Exception as e:
             self.get_logger().warn(f"Failed to parse hazard_points2: {e}")
 
@@ -283,6 +326,7 @@ class OMPath(Node):
     ):
         """
         Publish RViz markers for candidate paths, obstacles, and hazards.
+        All inputs (paths, obstacles, hazards) are in ROBOT frame.
         """
         ma = MarkerArray()
 
@@ -292,7 +336,7 @@ class OMPath(Node):
         wipe.action = Marker.DELETEALL
         ma.markers.append(wipe)
 
-        # Rays (colored by availability)
+        # Rays (colored by availability) – already in ROBOT frame
         for idx, path_arr in enumerate(paths):
             line = Marker()
             line.header.frame_id = frame_id
@@ -325,16 +369,10 @@ class OMPath(Node):
                     1.0,
                 )
 
-            # Display rotation: -sensor_mounting_angle
-            rot = -self.sensor_mounting_angle
             for x, y in zip(path_arr[0], path_arr[1]):
-                a = math.radians(rot)
-                c, s = math.cos(a), math.sin(a)
-                px, py = c * float(x) - s * float(y), s * float(x) + c * float(y)
-                line.points.append(Point(x=px, y=py, z=0.0))
+                line.points.append(Point(x=float(x), y=float(y), z=0.0))
             ma.markers.append(line)
 
-            # Endpoint labels
             t = Marker()
             t.header.frame_id = frame_id
             t.header.stamp = stamp
@@ -346,19 +384,13 @@ class OMPath(Node):
             t.color.r = t.color.g = t.color.b = 1.0
             t.color.a = 0.9
             ex, ey = float(path_arr[0][-1]), float(path_arr[1][-1])
-            a = math.radians(rot)
-            c, s = math.cos(a), math.sin(a)
-            tx, ty = c * ex - s * ey, s * ex + c * ey
-            t.pose.position.x = tx
-            t.pose.position.y = ty
+            t.pose.position.x = ex
+            t.pose.position.y = ey
             t.pose.position.z = 0.06
-            ang_disp = (
-                (path_angles[idx] - self.sensor_mounting_angle + 180.0) % 360.0
-            ) - 180.0
-            t.text = f"{idx} ({int(ang_disp)}°)"
+            t.text = f"{idx} ({int(path_angles[idx])}°)"
             ma.markers.append(t)
 
-        # Obstacles (orange)
+        # Obstacles (orange) - already in robot frame
         if obstacles_xy:
             pts = Marker()
             pts.header.frame_id = frame_id
@@ -369,15 +401,11 @@ class OMPath(Node):
             pts.action = Marker.ADD
             pts.scale.x = pts.scale.y = 0.03
             pts.color.r, pts.color.g, pts.color.b, pts.color.a = 1.0, 0.5, 0.0, 0.9
-            rot = -self.sensor_mounting_angle
-            a = math.radians(rot)
-            c, s = math.cos(a), math.sin(a)
             for x, y in obstacles_xy:
-                px, py = c * float(x) - s * float(y), s * float(x) + c * float(y)
-                pts.points.append(Point(x=px, y=py, z=0.0))
+                pts.points.append(Point(x=float(x), y=float(y), z=0.0))
             ma.markers.append(pts)
 
-        # Hazards (blue)
+        # Hazards (blue) – also in robot frame
         if hazards_xy:
             h = Marker()
             h.header.frame_id = frame_id
@@ -388,12 +416,8 @@ class OMPath(Node):
             h.action = Marker.ADD
             h.scale.x = h.scale.y = 0.035
             h.color.r, h.color.g, h.color.b, h.color.a = 0.2, 0.5, 0.9, 0.9
-            rot = -self.sensor_mounting_angle
-            a = math.radians(rot)
-            c, s = math.cos(a), math.sin(a)
             for x, y in hazards_xy:
-                px, py = c * float(x) - s * float(y), s * float(x) + c * float(y)
-                h.points.append(Point(x=px, y=py, z=0.0))
+                h.points.append(Point(x=float(x), y=float(y), z=0.0))
             ma.markers.append(h)
 
         self.markers_pub.publish(ma)

@@ -167,7 +167,7 @@ class LocalTraversability(Node):
         # Hazard outputs
 
         self.hazard_points_frame = (
-            "laser"  # hazard points expressed in this frame (for om_path)
+            "base_link"  # hazard points expressed in this frame (for om_path)
         )
         self.hazard_thinning_stride = 1  # 1 => keep every cell, >1 => sub-sample
         self.hazard_points_topic_pc2 = "/traversability/hazard_points2"

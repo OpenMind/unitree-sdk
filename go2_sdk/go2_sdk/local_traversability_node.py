@@ -150,8 +150,6 @@ class LocalTraversability(Node):
             f"({self.hazard_points_frame})"
         )
 
-    # ------------------------------------------------------------------ utils
-
     def _publish_hazard_cloud2(self, xyz: np.ndarray, frame_id: str) -> None:
         """
         Publish a PointCloud2 of hazard cell centers.
@@ -168,8 +166,6 @@ class LocalTraversability(Node):
         header.frame_id = frame_id
         msg = pc2.create_cloud_xyz32(header, xyz.tolist())
         self.hazard_pub_pc2.publish(msg)
-
-    # ---------------------------------------------------------------- callbacks
 
     def pc2_call_back(self, msg: PointCloud2) -> None:
         """
@@ -197,8 +193,6 @@ class LocalTraversability(Node):
             return
 
         self._run_pipeline(points, source_frame)
-
-    # ---------------------------------------------------------------- pipeline
 
     def _run_pipeline(
         self,

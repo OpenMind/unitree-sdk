@@ -76,7 +76,7 @@ class AprilTagNode(Node):
         cx = msg.k[2]
         cy = msg.k[5]
         self.camera_params = [fx, fy, cx, cy]
-        if self.load_camera_info == False:
+        if not self.load_camera_info:
             self.get_logger().info(
                 f"Camera intrinsics loaded: fx={fx}, fy={fy}, cx={cx}, cy={cy}"
             )

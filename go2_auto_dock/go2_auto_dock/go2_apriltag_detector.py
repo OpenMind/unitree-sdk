@@ -10,7 +10,7 @@ from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from rclpy.node import Node
-from sensor_msgs.msg import CameraInfo, Image
+from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray
 from tf2_ros import TransformBroadcaster
 
@@ -177,7 +177,6 @@ class AprilTagNode(Node):
                     if isinstance(result, tuple) and len(result) == 3:
                         # Extract the 4x4 transformation matrix
                         T_matrix = result[0]
-                        pose_err1 = result[1]
                         pose_err2 = result[2]
 
                         # Extract rotation (upper-left 3x3) and translation (upper-right 3x1)
@@ -396,8 +395,6 @@ class AprilTagNode(Node):
                 tag1_info = tag_dict[tag_id1]
                 tag2_info = tag_dict[tag_id2]
 
-                det1 = tag1_info["detection"]
-                det2 = tag2_info["detection"]
                 pose_t1 = tag1_info["pose_t"]
                 pose_t2 = tag2_info["pose_t"]
 

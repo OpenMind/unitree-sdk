@@ -30,7 +30,7 @@ def create_straight_line_path_from_angle(angle_degrees, length=1.05, num_points=
 
 # Define 9 straight line paths separated by 15 degrees
 # Center path is 0° (straight forward), then ±15°, ±30°, ±45°, ±60°
-path_angles = [-60, -45, -30, -15, 0, 15, 30, 45, 60, 180]  # degrees
+path_angles = [60, 45, 30, 15, 0, -15, -30, -45, -60, 180]  # degrees
 path_length = 1.05  # meters
 
 paths = [create_straight_line_path_from_angle(a, path_length) for a in path_angles]

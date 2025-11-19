@@ -158,7 +158,7 @@ def generate_launch_description():
                     "--y",
                     "0",
                     "--z",
-                    "0.30",
+                    "0.10",
                     "--roll",
                     "0",
                     "--pitch",

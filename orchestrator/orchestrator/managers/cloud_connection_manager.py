@@ -1,7 +1,6 @@
 import json
 import os
 from typing import Callable, Optional
-from uuid import uuid4
 
 from ..utils.ws_client import WebSocketClient
 from ..utils.ws_server import WebSocketServer

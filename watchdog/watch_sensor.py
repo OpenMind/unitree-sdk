@@ -293,7 +293,7 @@ class WatchSensor(Node):
         try:
             if hasattr(self, "docker_client"):
                 self.docker_client.close()
-        except:
+        except Exception:
             pass
 
 

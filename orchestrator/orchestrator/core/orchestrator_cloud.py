@@ -73,10 +73,10 @@ class OrchestratorCloud(Node):
         self.asr_text_sub = self.create_subscription(
             OMASRText, "/om/asr/text", self.ros_handlers.asr_text_callback, 10
         )
-        self.avatar_face_sub = self.create_subscription(
+        self.avatar_request_sub = self.create_subscription(
             OMAvatarFaceRequest,
             "/om/avatar/request",
-            self.ros_handlers.avatar_face_callback,
+            self.ros_handlers.avatar_request_callback,
             10,
         )
 

@@ -88,30 +88,33 @@ class LocalTraversability(Node):
         self.map_frame = "base_link"
         self.hazard_points_frame = "base_link"
 
-        # Local grid geometry (centered on base_link)
-        self.local_grid_resolution_m = 0.05  # 5 cm per cell
+        # Local grid geometry & region of interest in robot-centric frame
+        self.local_grid_resolution_m = 0.05  # cell size (5 cm)
         self.local_grid_size_m = 5.0  # 5 m x 5 m grid
-        self.max_forward_range_m = 2.0  # only look 2 m in front
+        self.max_forward_range_m = 2.0  # only consider points within 2 m in front
         self.half_lateral_fov_m = 2.5  # +/- 2.5 m sideways (covers 5 m width)
         self.min_height_m = -1.0  # ignore points below this height
         self.max_height_m = 2.0  # ignore points above this height
 
-        # Slope thresholds
+        # Slope thresholds (for continuous sloped surfaces)
         self.max_allowed_slope_deg = 10.0  # any slope > 10° is hazardous
-        self.max_forward_downhill_deg = 8.0  # forward downhill > 8° is hazardous
-        self.slope_baseline_cells = 3  # baseline distance in cells
+        self.max_forward_downhill_deg = (
+            8.0  # >= 8° downhill in forward direction is hazardous
+        )
+        self.slope_baseline_cells = 3  # use 3 cells (~15 cm) as baseline spacing
 
-        # Local height discontinuity (steps / holes) in a 3x3 neighborhood
-        self.local_relief_step_thresh_m = 0.12  # > 12 cm height difference => hazard
+        # Local height discontinuity (steps / stairs / holes) in a 3x3 neighborhood
+        self.local_relief_step_thresh_m = 0.12  # > 8 cm height difference => hazard
 
-        # Minimum connected hazard region size (to remove tiny speckles)
-        self.min_hazard_blob_side_m = 0.30  # 30 cm x 30 cm minimum blob
+        # Minimum size of a connected hazardous blob (remove tiny speckles)
+        # Any connected hazard region smaller than [min_hazard_blob_side_m]^2 is removed.
+        self.min_hazard_blob_side_m = 0.30  # 30 cm x 30 cm blob minimum
 
-        # Optional inflation radius around hazards (safety margin)
+        # Hazard inflation radius: extra safety margin around hazards
         self.hazard_inflation_radius_m = 0.0
 
         # Hazard output configuration
-        self.hazard_thinning_stride = 1
+        self.hazard_thinning_stride = 1  # 1 => keep every cell, >1 => sub-sample
         self.hazard_points_topic_pc2 = "/traversability/hazard_points2"
 
         # TF buffer / listener
@@ -218,7 +221,7 @@ class LocalTraversability(Node):
         source_frame : str
             Name of the TF frame for the input cloud.
         """
-        # 1) Transform camera -> base_link (self.map_frame)
+        # Transform camera -> base_link (self.map_frame)
         try:
             transform_cloud_to_robot = self.tf_buffer.lookup_transform(
                 self.map_frame,
@@ -246,7 +249,7 @@ class LocalTraversability(Node):
         y_robot = points_robot[:, 1]
         z_robot = points_robot[:, 2]
 
-        # 2) ROI filter in robot frame: only points near the robot
+        # ROI filter in robot frame: only points near the robot
         roi_mask = (
             (x_robot >= 0.0)
             & (x_robot <= self.max_forward_range_m)
@@ -266,14 +269,13 @@ class LocalTraversability(Node):
         y_roi = y_robot[roi_mask]
         z_roi = z_robot[roi_mask]
 
-        # 3) Build the local height map around base_link
+        # Local grid geometry: 5 m x 5 m centered on base_link
         grid_size_m = self.local_grid_size_m
         res = self.local_grid_resolution_m
         grid_width = int(math.ceil(grid_size_m / res))
         grid_height = int(math.ceil(grid_size_m / res))
 
-        # base_link is at the grid center, so the origin is the bottom-left corner.
-        # In base_link coordinates this corresponds to (-L/2, -L/2).
+        # Origin (bottom-left corner) in map_frame; robot is at the grid center
         origin_x = -grid_size_m / 2.0
         origin_y = -grid_size_m / 2.0
 
@@ -309,12 +311,12 @@ class LocalTraversability(Node):
 
         known_mask = ~np.isnan(height_map)
 
-        # 4) Slope computation
+        # Gradients / slope on the height map
         dz_dx = np.full_like(height_map, np.nan, dtype=np.float32)
         dz_dy = np.full_like(height_map, np.nan, dtype=np.float32)
         baseline_cells = max(1, int(self.slope_baseline_cells))
 
-        # x-direction slope
+        # orward-backward slope (x direction)
         if grid_width > 2 * baseline_cells:
             mid_x_mask = (
                 known_mask[:, 2 * baseline_cells :]
@@ -325,7 +327,7 @@ class LocalTraversability(Node):
                 - height_map[:, : -2 * baseline_cells][mid_x_mask]
             ) / (2.0 * baseline_cells * res)
 
-        # y-direction slope
+        # Left-right slope (y direction)
         if grid_height > 2:
             mid_y_mask = known_mask[2:, :] & known_mask[:-2, :]
             dz_dy[1:-1, :][mid_y_mask] = (
@@ -344,7 +346,7 @@ class LocalTraversability(Node):
             slope_mag_deg > self.max_allowed_slope_deg
         )
 
-        # 5) Local height relief (steps / holes) using a 3x3 window
+        # Local height relief: 3x3 window; big delta -> step/hole hazard
         h_for_max = np.nan_to_num(height_map, nan=-np.inf)
         h_for_min = np.nan_to_num(height_map, nan=+np.inf)
         local_max = maximum_filter(h_for_max, size=3)
@@ -358,10 +360,10 @@ class LocalTraversability(Node):
             local_relief[known_mask] > self.local_relief_step_thresh_m
         )
 
-        # 6) Combine all hazard sources
+        # Combine hazards from all sources
         hazard = step_hazard | hazard_slope_down | hazard_slope_mag
 
-        # Remove tiny blobs using connected components
+        # De-speckle: keep only blobs with area >= (min_hazard_blob_side_m)^2
         structure = np.ones((3, 3), dtype=bool)
         labels, num_labels = label(hazard, structure=structure)
         if num_labels > 0:
@@ -374,13 +376,13 @@ class LocalTraversability(Node):
         else:
             hazard = np.zeros_like(hazard, dtype=bool)
 
-        # Optional dilation (inflation) around hazards
+        # Optional dilation around hazard blobs (currently zero radius => no-op)
         inflate_cells = max(0, int(round(self.hazard_inflation_radius_m / res)))
         if inflate_cells > 0:
             se = np.ones((2 * inflate_cells + 1, 2 * inflate_cells + 1), dtype=bool)
             hazard = binary_dilation(hazard, structure=se)
 
-        # 7) OccupancyGrid: -1 unknown, 0 free, 100 hazardous
+        # Build OccupancyGrid (-1 unknown, 0 free, 100 hazard/occupied)
         occupancy = np.full((grid_height, grid_width), -1, dtype=np.int8)
         free_mask = (~hazard) & (~np.isnan(height_map))
         occupancy[free_mask] = 0
@@ -401,10 +403,10 @@ class LocalTraversability(Node):
         grid.data = occupancy.flatten(order="C").tolist()
         self.grid_pub.publish(grid)
 
-        # 8) Hazard cell centers as a PointCloud2 in base_link
+        # Hazard point clouds (for om_path)
         hazard_mask = np.array(hazard, dtype=bool)
 
-        # Optional thinning (subsampling)
+        # Thin points by stride if desired
         if self.hazard_thinning_stride > 1:
             thinning_mask = np.zeros_like(hazard_mask, dtype=bool)
             thinning_mask[

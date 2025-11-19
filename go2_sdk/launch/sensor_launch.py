@@ -171,6 +171,17 @@ def generate_launch_description():
                     "camera_link",
                 ],
                 output="screen",
+                respawn=True,
+                respawn_delay=2.0,
+            ),
+            Node(
+                package="topic_tools",
+                executable="relay",
+                name="odom_relay",
+                arguments=["/utlidar/robot_odom", "/odom"],
+                output="screen",
+                respawn=True,
+                respawn_delay=2.0,
             ),
             Node(
                 package="go2_sdk",

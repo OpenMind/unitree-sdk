@@ -47,6 +47,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "ruff>=0.9.3",
     "flake8>=6.0.0",
     "black>=23.0.0",
     "isort>=5.12.0",

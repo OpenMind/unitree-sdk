@@ -383,7 +383,7 @@ class ROSHandlers:
 
             self.orchestrator.avatar_request_pub.publish(avatar_request_msg)
             self.orchestrator.get_logger().debug(
-                f"Published avatar health check request"
+                "Published avatar health check request"
             )
 
         except Exception as e:

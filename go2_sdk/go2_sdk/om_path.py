@@ -142,7 +142,6 @@ class OMPath(Node):
         Y = array[:, 1]
         D = array[:, 3]
 
-        N = len(path_angles)
         possible_paths = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         bad_paths = []
         blocked_by_obstacle_set = set()

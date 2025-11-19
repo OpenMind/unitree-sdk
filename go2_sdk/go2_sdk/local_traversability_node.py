@@ -4,7 +4,6 @@ import geometry_msgs.msg
 import numpy as np
 import rclpy
 import tf2_ros
-from geometry_msgs.msg import Point32
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
@@ -15,7 +14,7 @@ from scipy.ndimage import (
     maximum_filter,
     minimum_filter,
 )
-from sensor_msgs.msg import PointCloud, PointCloud2
+from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
 from std_msgs.msg import Header
 

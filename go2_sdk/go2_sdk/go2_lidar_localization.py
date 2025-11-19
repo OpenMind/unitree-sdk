@@ -1088,7 +1088,7 @@ class Go2LidarLocalizationNode(Node):
                 rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.05),
             )
-        except (TransformException, Exception) as e:
+        except (TransformException, Exception):
             return
 
         # Map to base transform

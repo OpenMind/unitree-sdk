@@ -26,7 +26,7 @@ jobs:
 
     - name: Run Ruff
       run: |
-        uv run ruff check .
+        ruff check .
 
     - name: Check code formatting with black
       run: |

@@ -757,7 +757,7 @@ class Go2LidarLocalizationNode(Node):
                 while self.lidar_yaw < -pi:
                     self.lidar_yaw += 2 * pi
 
-                self.get_logger().info(
+                self.get_logger().debug(
                     f"Predicted pose update: dx={dx_pixels:.2f}, dy={dy_pixels:.2f}, dyaw={dyaw_odom:.3f}",
                     throttle_duration_sec=1.0,
                 )
@@ -954,7 +954,7 @@ class Go2LidarLocalizationNode(Node):
         self.is_pose_confident = match_quality >= self.min_confidence_for_prediction
         confidence_status = "confident" if self.is_pose_confident else "not confident"
 
-        self.get_logger().info(
+        self.get_logger().debug(
             f"Match quality: {match_quality:.3f}, confidence threshold: {self.min_confidence_for_prediction:.3f} - {confidence_status}",
             throttle_duration_sec=2.0,
         )
@@ -993,7 +993,7 @@ class Go2LidarLocalizationNode(Node):
             self.localization_pose_pub.publish(msg)
 
             self.get_logger().info(
-                f"Published localization pose - score: {max_sum}, quality: {match_quality*100:.2f}%, points: {len(self.scan_points)}, confident: {self.is_confident}"
+                f"Published localization pose - score: {max_sum}, quality: {match_quality*100:.2f}%, points: {len(self.scan_points)}, confident: {self.is_pose_confident}"
             )
 
         except (TransformException, Exception) as e:

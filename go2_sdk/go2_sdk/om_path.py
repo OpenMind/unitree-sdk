@@ -290,7 +290,8 @@ class OMPath(Node):
 
     def hazard_callback_pc2(self, msg: PointCloud2):
         """
-        Read hazard PC2 (x,y), rotate from LASER to robot frame, store as Nx2.
+        Read hazard points already expressed in robot frame (base_link),
+        store as an (N, 2) array [x, y] in self.hazard_xy_robot.
         """
         try:
             arr = pc2.read_points_numpy(msg, field_names=("x", "y"), skip_nans=True)

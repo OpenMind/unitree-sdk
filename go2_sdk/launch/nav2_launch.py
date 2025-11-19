@@ -51,7 +51,7 @@ def generate_launch_description():
     global_localization_particles = LaunchConfiguration(
         "global_localization_particles",
         default=EnvironmentVariable(
-            "GLOBAL_LOCALIZATION_PARTICLES", default_value="10000"
+            "GLOBAL_LOCALIZATION_PARTICLES", default_value="5000"
         ),
     )
 
@@ -202,7 +202,7 @@ def generate_launch_description():
                         "axis_linear.x": 1,
                         "axis_linear.y": 0,
                         "axis_angular.z": 3,
-                        "enable_button": 10,
+                        "enable_button": 7,
                         "scale_linear.x": 0.5,
                         "scale_angular.z": 0.5,
                         "enable_turbo_button": 9,
@@ -300,7 +300,7 @@ def generate_launch_description():
                 parameters=[
                     {"use_sim_time": False},
                     {"autostart": True},
-                    # {'node_names': ['map_server', 'amcl']}]
+                    # {'node_names': ['map_server', 'amcl']}
                     {"node_names": ["map_server"]},
                 ],
             ),

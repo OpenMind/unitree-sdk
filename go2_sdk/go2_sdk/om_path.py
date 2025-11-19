@@ -236,7 +236,7 @@ class OMPath(Node):
                 source_frame,
                 Time.from_msg(obstacle_cloud_msg.header.stamp),
             )
-        except Exception as ex:
+        except TransformException as ex:
             self.get_logger().warn(
                 f"TF lookup failed for depth obstacles {source_frame} -> {target_frame}: {ex}"
             )
@@ -261,7 +261,7 @@ class OMPath(Node):
                 point_in_robot_frame = do_transform_point(
                     point_in_source_frame, transform_camera_to_robot
                 )
-            except Exception as ex:
+            except TransformException as ex:
                 self.get_logger().warn(f"Failed to transform depth point: {ex}")
                 continue
 

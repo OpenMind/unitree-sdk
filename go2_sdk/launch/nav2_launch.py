@@ -152,12 +152,6 @@ def generate_launch_description():
                 output="screen",
             ),
             Node(
-                package="topic_tools",
-                executable="relay",
-                arguments=["/utlidar/robot_odom", "/odom"],
-                output="screen",
-            ),
-            Node(
                 package="go2_sdk",
                 executable="pose_to_tf",
                 output="screen",

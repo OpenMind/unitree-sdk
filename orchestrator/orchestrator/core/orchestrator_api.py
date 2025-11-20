@@ -12,12 +12,12 @@ from om_api.msg import (
     OMAPIResponse,
     OMAvatarFaceRequest,
     OMAvatarFaceResponse,
+    OMConfigRequest,
+    OMConfigResponse,
     OMModeReponse,
     OMModeRequest,
     OMTTSReponse,
     OMTTSRequest,
-    OMConfigRequest,
-    OMConfigResponse,
 )
 from unitree_go.msg import LowState
 

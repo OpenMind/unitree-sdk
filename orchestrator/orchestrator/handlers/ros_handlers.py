@@ -14,10 +14,10 @@ from om_api.msg import (
     OMAPIResponse,
     OMASRText,
     OMAvatarFaceRequest,
-    OMModeRequest,
-    OMTTSRequest,
     OMConfigRequest,
     OMConfigResponse,
+    OMModeRequest,
+    OMTTSRequest,
 )
 
 if TYPE_CHECKING:
@@ -223,7 +223,7 @@ class ROSHandlers:
             # Handle config-related actions
             elif action == "get_config":
                 self._handle_config_request(msg)
-                
+
             else:
                 self.orchestrator.get_logger().error(f"Unknown action: {action}")
                 self._publish_api_response(
@@ -473,7 +473,7 @@ class ROSHandlers:
             config_req = OMConfigRequest()
             config_req.header.stamp = self.orchestrator.get_clock().now().to_msg()
             config_req.request_id = msg.request_id
-            
+
             self.orchestrator.config_request_pub.publish(config_req)
             self.orchestrator.get_logger().info(
                 f"Published config request with ID {msg.request_id}"
@@ -484,7 +484,10 @@ class ROSHandlers:
                 f"Failed to publish config request: {str(e)}"
             )
             self._publish_api_response(
-                msg.request_id, 500, "error", f"Failed to publish config request: {str(e)}"
+                msg.request_id,
+                500,
+                "error",
+                f"Failed to publish config request: {str(e)}",
             )
 
     def _handle_remote_control(self, msg):
@@ -801,7 +804,7 @@ class ROSHandlers:
         response_msg = OMAPIResponse()
         response_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
         response_msg.request_id = msg.request_id
-        
+
         # Check if config retrieval is successful
         if msg.config:
             response_msg.code = 0
@@ -813,7 +816,9 @@ class ROSHandlers:
             response_msg.message = msg.message
 
         self.orchestrator.api_response_pub.publish(response_msg)
-        self.orchestrator.get_logger().info(f"Published config response for {msg.request_id}")
+        self.orchestrator.get_logger().info(
+            f"Published config response for {msg.request_id}"
+        )
 
     def cloud_api_response_callback(self, response):
         """

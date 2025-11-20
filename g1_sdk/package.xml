@@ -1,5 +1,4 @@
 <?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>g1_sdk</name>
   <version>0.1.0</version>
@@ -17,6 +16,20 @@
   <depend>launch</depend>
   <depend>launch_ros</depend>
   <depend>ament_index_python</depend>
+  <depend>pointcloud_to_laserscan</depend>
+  <depend>nav2_lifecycle_manager</depend>
+  <depend>nav2_controller</depend>
+  <depend>nav2_smoother</depend>
+  <depend>nav2_planner</depend>
+  <depend>nav2_behaviors</depend>
+  <depend>nav2_bt_navigator</depend>
+  <depend>nav2_waypoint_follower</depend>
+  <depend>nav2_velocity_smoother</depend>
+  <depend>rtabmap_slam</depend>
+  <depend>rtabmap_viz</depend>
+  <depend>rtabmap_util</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>joint_state_publisher</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

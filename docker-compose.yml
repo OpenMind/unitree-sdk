@@ -84,6 +84,7 @@ services:
       - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
       - CYCLONEDDS_INTERFACE=${CYCLONEDDS_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
+      - ROBOT_TYPE=${ROBOT_TYPE:-}
     command: "ros2 launch orchestrator orchestrator_launch.py"
     volumes:
       - /dev:/dev

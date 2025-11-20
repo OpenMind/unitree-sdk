@@ -72,7 +72,7 @@ class G1APINode(Node):
         self.api_thread = threading.Thread(target=self.run_flask_app)
         self.api_thread.start()
 
-    self.get_logger().info("G1 API Node initialized")
+        self.get_logger().info("G1 API Node initialized")
 
     def run_flask_app(self):
         """

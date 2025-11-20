@@ -61,10 +61,10 @@ ENV CYCLONEDDS_HOME=/app/cyclonedds/install \
 
 WORKDIR /app
 
-RUN mkdir -p /app/unitree_go2_ros2_sdk
-COPY . /app/unitree_go2_ros2_sdk
+RUN mkdir -p /app/unitree_sdk
+COPY . /app/unitree_sdk
 
-WORKDIR /app/unitree_go2_ros2_sdk
+WORKDIR /app/unitree_sdk
 
 RUN rosdep install -y --ignore-src --from-paths . -r
 RUN pip install -e . --force-reinstall --ignore-installed --no-cache-dir
@@ -75,7 +75,7 @@ RUN echo '#!/bin/bash' > /entrypoint.sh && \
     echo '' >> /entrypoint.sh && \
     echo '# Source ROS environment' >> /entrypoint.sh && \
     echo 'source /opt/ros/humble/setup.bash' >> /entrypoint.sh && \
-    echo 'source /app/unitree_go2_ros2_sdk/install/setup.bash' >> /entrypoint.sh && \
+    echo 'source /app/unitree_sdk/install/setup.bash' >> /entrypoint.sh && \
     echo '' >> /entrypoint.sh && \
     echo '# If no arguments provided, run default command' >> /entrypoint.sh && \
     echo 'if [ $# -eq 0 ]; then' >> /entrypoint.sh && \
@@ -85,7 +85,7 @@ RUN echo '#!/bin/bash' > /entrypoint.sh && \
     echo 'fi' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
-# RUN echo "deb [trusted=yes] https://download.eclipse.org/zenoh/debian-repo/ /" | sudo tee -a /etc/apt/sources.list > /dev/null
-# RUN apt update && apt install zenoh-bridge-ros2dds -y
+RUN echo "deb [trusted=yes] https://download.eclipse.org/zenoh/debian-repo/ /" | tee -a /etc/apt/sources.list > /dev/null
+RUN apt update && apt install zenoh-bridge-ros2dds -y
 
 ENTRYPOINT ["/entrypoint.sh"]

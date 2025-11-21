@@ -82,7 +82,7 @@ class MapManager:
 
                     return {
                         "status": "success",
-                        "message": f"G1 map saved successfully using RTAB-Map backup",
+                        "message": "G1 map saved successfully using RTAB-Map backup",
                         "base_path": map_path,
                         "map_name": map_name,
                         "info": "Map saved to RTAB-Map's configured database location",

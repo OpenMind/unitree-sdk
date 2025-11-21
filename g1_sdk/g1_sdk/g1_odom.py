@@ -41,9 +41,9 @@ class UnitreeOdomConverter(Node):
         if self.publish_tf:
             self.tf_broadcaster = TransformBroadcaster(self)
 
-        self.get_logger().info(f"Unitree Odom Converter initialized")
+        self.get_logger().info("Unitree Odom Converter initialized")
         self.get_logger().info(f"Subscribing to: {input_topic}")
-        self.get_logger().info(f"Publishing to: /odom")
+        self.get_logger().info("Publishing to: /odom")
         self.get_logger().info(
             f"TF: {self.odom_frame_id} -> {self.base_frame_id} (enabled: {self.publish_tf})"
         )

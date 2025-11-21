@@ -12,6 +12,8 @@ from om_api.msg import (
     OMAPIResponse,
     OMAvatarFaceRequest,
     OMAvatarFaceResponse,
+    OMConfigRequest,
+    OMConfigResponse,
     OMModeReponse,
     OMModeRequest,
     OMTTSReponse,
@@ -85,6 +87,9 @@ class OrchestratorAPI(Node):
         self.tts_request_pub = self.create_publisher(
             OMTTSRequest, "/om/tts/request", 10
         )
+        self.config_request_pub = self.create_publisher(
+            OMConfigRequest, "/om/config/request", 10
+        )
         self.move_cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
 
     def _setup_ros_subscribers(self):
@@ -116,6 +121,12 @@ class OrchestratorAPI(Node):
             OMTTSReponse,
             "/om/tts/response",
             self.ros_handlers.tts_response_callback,
+            10,
+        )
+        self.config_response_sub = self.create_subscription(
+            OMConfigResponse,
+            "/om/config/response",
+            self.ros_handlers.config_response_callback,
             10,
         )
 

@@ -36,6 +36,8 @@
                       ".*/om/asr/text",
                       ".*/om/avatar/request",
                       ".*/om/avatar/response",
+                      ".*/om/config/request",
+                      ".*/om/config/response",
 
                       // Motion control
                       ".*/cmd_vel",
@@ -144,6 +146,8 @@
                       ".*/om/asr/text",
                       ".*/om/avatar/request",
                       ".*/om/avatar/response",
+                      ".*/om/config/request",
+                      ".*/om/config/response",
 
                       // Motion control
                       ".*/cmd_vel",

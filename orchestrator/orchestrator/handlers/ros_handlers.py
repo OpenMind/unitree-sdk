@@ -14,6 +14,8 @@ from om_api.msg import (
     OMAPIResponse,
     OMASRText,
     OMAvatarFaceRequest,
+    OMConfigRequest,
+    OMConfigResponse,
     OMModeRequest,
     OMTTSRequest,
 )
@@ -217,6 +219,10 @@ class ROSHandlers:
             # Handle remote control action
             elif action == "remote_control":
                 self._handle_remote_control(msg)
+
+            # Handle config-related actions
+            elif action in ["get_config", "set_config"]:
+                self._handle_config_request(msg)
 
             else:
                 self.orchestrator.get_logger().error(f"Unknown action: {action}")
@@ -444,6 +450,63 @@ class ROSHandlers:
             )
             self._publish_api_response(
                 msg.request_id, 500, "error", f"Failed to publish TTS request: {str(e)}"
+            )
+
+    def _handle_config_request(self, msg):
+        """
+        Handle config-related requests.
+
+        Parameters:
+        -----------
+        msg : OMAPIRequest
+            The original API request message.
+        """
+        self.orchestrator.get_logger().info("Received config request")
+
+        if not hasattr(self.orchestrator, "config_request_pub"):
+            self._publish_api_response(
+                msg.request_id, 500, "error", "Config request publisher not available"
+            )
+            return
+
+        try:
+            config_req = OMConfigRequest()
+            config_req.header.stamp = self.orchestrator.get_clock().now().to_msg()
+            config_req.request_id = msg.request_id
+
+            if msg.action == "set_config":
+                try:
+                    if msg.parameters:
+                        params = json.loads(msg.parameters)
+                        if "config" in params:
+                            config_req.config = json.dumps(params["config"])
+                        else:
+                            config_req.config = msg.parameters
+                    else:
+                        self._publish_api_response(
+                            msg.request_id,
+                            400,
+                            "error",
+                            "Config data required for set_config",
+                        )
+                        return
+                except json.JSONDecodeError:
+                    config_req.config = msg.parameters
+
+            self.orchestrator.config_request_pub.publish(config_req)
+            self.orchestrator.get_logger().info(
+                f"Published config request ({msg.action}) with ID {msg.request_id}"
+            )
+
+        except Exception as e:
+            self.orchestrator.get_logger().error(
+                f"Failed to publish config request: {str(e)}"
+            )
+            self._publish_api_response(
+                msg.request_id,
+                500,
+                "error",
+                f"Failed to publish config request: {str(e)}",
             )
 
     def _handle_remote_control(self, msg):
@@ -741,6 +804,40 @@ class ROSHandlers:
         response_msg.message = msg.message
 
         self.orchestrator.api_response_pub.publish(response_msg)
+
+    def config_response_callback(self, msg: OMConfigResponse):
+        """
+        Callback for config response messages, converting to OMAPIResponse.
+
+        Parameters:
+        -----------
+        msg : OMConfigResponse
+            The incoming config response message.
+        """
+        if not hasattr(self.orchestrator, "api_response_pub"):
+            self.orchestrator.get_logger().warning(
+                "API response publisher not available"
+            )
+            return
+
+        response_msg = OMAPIResponse()
+        response_msg.header.stamp = self.orchestrator.get_clock().now().to_msg()
+        response_msg.request_id = msg.request_id
+
+        # Check if config retrieval is successful
+        if msg.config:
+            response_msg.code = 0
+            response_msg.status = "success"
+            response_msg.message = msg.config
+        else:
+            response_msg.code = 1
+            response_msg.status = "error"
+            response_msg.message = msg.message
+
+        self.orchestrator.api_response_pub.publish(response_msg)
+        self.orchestrator.get_logger().info(
+            f"Published config response for {msg.request_id}"
+        )
 
     def cloud_api_response_callback(self, response):
         """

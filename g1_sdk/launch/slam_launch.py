@@ -128,7 +128,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "rviz",
-                default_value="true",
+                default_value="false",
                 description="Launch RViz for visualization",
             ),
             # Mapping mode node (with delete_db_on_start)

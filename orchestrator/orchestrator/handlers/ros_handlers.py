@@ -221,7 +221,7 @@ class ROSHandlers:
                 self._handle_remote_control(msg)
 
             # Handle config-related actions
-            elif action == "get_config":
+            elif action in ["get_config", "set_config"]:
                 self._handle_config_request(msg)
 
             else:
@@ -474,9 +474,28 @@ class ROSHandlers:
             config_req.header.stamp = self.orchestrator.get_clock().now().to_msg()
             config_req.request_id = msg.request_id
 
+            if msg.action == "set_config":
+                try:
+                    if msg.parameters:
+                        params = json.loads(msg.parameters)
+                        if "config" in params:
+                            config_req.config = json.dumps(params["config"])
+                        else:
+                            config_req.config = msg.parameters
+                    else:
+                        self._publish_api_response(
+                            msg.request_id,
+                            400,
+                            "error",
+                            "Config data required for set_config",
+                        )
+                        return
+                except json.JSONDecodeError:
+                    config_req.config = msg.parameters
+
             self.orchestrator.config_request_pub.publish(config_req)
             self.orchestrator.get_logger().info(
-                f"Published config request with ID {msg.request_id}"
+                f"Published config request ({msg.action}) with ID {msg.request_id}"
             )
 
         except Exception as e:

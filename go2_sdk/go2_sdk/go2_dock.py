@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import subprocess
-import time
 
 import rclpy
 from rclpy.node import Node

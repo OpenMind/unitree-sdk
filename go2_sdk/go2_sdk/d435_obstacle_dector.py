@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
@@ -63,9 +61,7 @@ class D435ObstacleDector(Node):
         ]
 
         depth_values = depth_image[rows, cols]
-
         valid_mask = depth_values > 0
-
         if not np.any(valid_mask):
             return []
 
@@ -73,10 +69,12 @@ class D435ObstacleDector(Node):
         cols_valid = cols[valid_mask]
         depth_valid = depth_values[valid_mask] / 1000.0  # Convert to meters
 
+        # Camera optical frame: x right, y down, z forward
         cam_x = (cols_valid - self.cx) * depth_valid / self.fx
         cam_y = (rows_valid - self.cy) * depth_valid / self.fy
         cam_z = depth_valid
 
+        # only use world_z to filter obstacles
         points_camera = np.vstack([cam_x, cam_y, cam_z])
 
         theta = np.radians(tilt_angle)
@@ -91,38 +89,35 @@ class D435ObstacleDector(Node):
         R_align = np.array(
             [
                 [0, 0, 1],  # Camera Z (forward) -> World X (forward)
-                [-1, 0, 0],  # Camera X (right) -> World Y (left)
-                [0, -1, 0],  # Camera Y (down) -> World Z (up)
+                [-1, 0, 0],  # Camera X (right)  -> World Y (left)
+                [0, -1, 0],  # Camera Y (down)   -> World Z (up)
             ]
         )
 
         R_combined = R_align @ R_tilt
-
         points_world = R_combined @ points_camera
 
         camera_position_world = np.array([[0], [0], [camera_height]])
         points_world = points_world + camera_position_world
 
-        world_x = points_world[0]
-        world_y = points_world[1]
-        world_z = points_world[2]
+        world_z = points_world[2]  # up
 
         obstacle_mask = world_z > self.obstacle_threshold
-
         if not np.any(obstacle_mask):
             return []
 
-        obstacles = []
-        world_x_filtered = world_x[obstacle_mask]
-        world_y_filtered = world_y[obstacle_mask]
-        world_z_filtered = world_z[obstacle_mask]
+        # Only select which points are obstacles, but output coordinates are still in camera frame
+        cam_x_filtered = cam_x[obstacle_mask]
+        cam_y_filtered = cam_y[obstacle_mask]
+        cam_z_filtered = cam_z[obstacle_mask]
 
-        for i in range(len(world_x_filtered)):
+        obstacles = []
+        for i in range(len(cam_x_filtered)):
             obstacles.append(
                 Point32(
-                    x=float(-world_y_filtered[i]),
-                    y=float(world_x_filtered[i]),
-                    z=float(world_z_filtered[i]),
+                    x=float(cam_x_filtered[i]),
+                    y=float(cam_y_filtered[i]),
+                    z=float(cam_z_filtered[i]),
                 )
             )
 

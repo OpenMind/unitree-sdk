@@ -63,7 +63,7 @@ class ProcessManager:
                 self.process.wait(timeout=5)
                 self.process = None
                 return True
-            except (ProcessLookupError, OSError, subprocess.TimeoutExpired) as e:
+            except (ProcessLookupError, OSError, subprocess.TimeoutExpired):
                 if self.process:
                     try:
                         os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)

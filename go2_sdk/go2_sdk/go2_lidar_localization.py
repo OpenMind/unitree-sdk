@@ -29,8 +29,17 @@ class Go2LidarLocalizationNode(Node):
         self.declare_parameter("velocity_threshold", 0.3)  # m/s
         self.declare_parameter("scan_match_interval", 0.2)  # seconds
         self.declare_parameter(
-            "global_localization_particles", 10000
+            "global_localization_particles", 5000
         )  # Number of random samples
+        self.declare_parameter(
+            "min_confidence_for_prediction", 0.9
+        )  # Minimum confidence threshold for pose prediction
+        self.declare_parameter(
+            "max_consecutive_failures", 5
+        )  # Maximum consecutive failures before triggering re-localization
+        self.declare_parameter(
+            "failure_quality_threshold", 0.9
+        )  # Quality threshold below which to consider a failure
 
         # Get parameters
         self.base_frame = self.get_parameter("base_frame").value
@@ -40,6 +49,15 @@ class Go2LidarLocalizationNode(Node):
         self.velocity_threshold = self.get_parameter("velocity_threshold").value
         self.scan_match_interval = self.get_parameter("scan_match_interval").value
         self.n_particles = self.get_parameter("global_localization_particles").value
+        self.min_confidence_for_prediction = self.get_parameter(
+            "min_confidence_for_prediction"
+        ).value
+        self.max_consecutive_failures = self.get_parameter(
+            "max_consecutive_failures"
+        ).value
+        self.failure_quality_threshold = self.get_parameter(
+            "failure_quality_threshold"
+        ).value
 
         # Initialize variables
         self.map_msg = None
@@ -61,6 +79,10 @@ class Go2LidarLocalizationNode(Node):
         self.is_initialized = False
         self.last_match_quality = 0.0
         self.buffered_scan = None  # Store scan for global localization
+
+        # Consecutive failure tracking for automatic re-localization
+        self.consecutive_failures = 0
+        self.last_failure_time = None
 
         # Odometry tracking for motion prediction
         self.last_odom_pose = None  # (x, y, yaw)
@@ -112,11 +134,21 @@ class Go2LidarLocalizationNode(Node):
 
         # Pose estimated flag
         self.is_pose_estimated = False
+        self.is_pose_confident = False
 
         self.get_logger().info("Lidar localization node initialized")
         self.get_logger().info(f"Velocity threshold: {self.velocity_threshold} m/s")
         self.get_logger().info(f"Scan match interval: {self.scan_match_interval} s")
         self.get_logger().info(f"Global localization particles: {self.n_particles}")
+        self.get_logger().info(
+            f"Minimum confidence for prediction: {self.min_confidence_for_prediction}"
+        )
+        self.get_logger().info(
+            f"Max consecutive failures: {self.max_consecutive_failures}"
+        )
+        self.get_logger().info(
+            f"Failure quality threshold: {self.failure_quality_threshold}"
+        )
 
     def initial_pose_callback(self, msg: PoseWithCovarianceStamped):
         """
@@ -151,6 +183,11 @@ class Go2LidarLocalizationNode(Node):
         self.lidar_yaw = -yaw
         self.clear_countdown = 30
         self.is_initialized = True
+        self.is_pose_confident = False
+
+        # Reset consecutive failure counter
+        self.consecutive_failures = 0
+        self.last_failure_time = None
 
         # Reset odometry tracking
         self.last_odom_pose = None
@@ -327,7 +364,12 @@ class Go2LidarLocalizationNode(Node):
         if best_pose is not None:
             self.lidar_x, self.lidar_y, self.lidar_yaw = best_pose
             self.is_initialized = True
+            self.is_pose_confident = False
             self.scan_count = 1
+
+            # Reset consecutive failure tracking
+            self.consecutive_failures = 0
+            self.last_failure_time = None
 
             self.last_odom_pose = None
             self.last_scan_match_time = None
@@ -344,6 +386,10 @@ class Go2LidarLocalizationNode(Node):
             if best_score < min_score_threshold:
                 self.get_logger().warn(
                     f"Low confidence in global localization (score: {best_score} < {min_score_threshold})"
+                )
+            else:
+                self.get_logger().info(
+                    f"Global localization successful (score: {best_score} >= {min_score_threshold})"
                 )
         else:
             self.get_logger().error("Global localization failed - no valid pose found")
@@ -647,10 +693,19 @@ class Go2LidarLocalizationNode(Node):
     def predict_pose_from_odometry(self):
         """
         Use odometry to predict where robot moved since last update
+        Only predict when previous estimation is confident
         """
         # Avoid the pose prediction on the global localization first run
         if not self.is_pose_estimated:
             self.is_pose_estimated = True
+            return
+
+        # Only predict pose if previous estimation was confident
+        if not self.is_pose_confident:
+            self.get_logger().info(
+                "Skipping pose prediction - previous estimation not confident enough",
+                throttle_duration_sec=2.0,
+            )
             return
 
         try:
@@ -701,6 +756,11 @@ class Go2LidarLocalizationNode(Node):
                     self.lidar_yaw -= 2 * pi
                 while self.lidar_yaw < -pi:
                     self.lidar_yaw += 2 * pi
+
+                self.get_logger().debug(
+                    f"Predicted pose update: dx={dx_pixels:.2f}, dy={dy_pixels:.2f}, dyaw={dyaw_odom:.3f}",
+                    throttle_duration_sec=1.0,
+                )
 
             # Store current pose for next iteration
             current_q = current_odom.transform.rotation
@@ -787,11 +847,11 @@ class Go2LidarLocalizationNode(Node):
 
             offsets = [(0, 0), (2, 0), (-2, 0), (0, 2), (0, -2)]
 
-            if iteration <= 3:
+            if iteration <= 5:
                 yaw_offsets = [
                     0,
-                    10 * self.deg_to_rad,
-                    -10 * self.deg_to_rad,
+                    15 * self.deg_to_rad,
+                    -15 * self.deg_to_rad,
                     30 * self.deg_to_rad,
                     -30 * self.deg_to_rad,
                     45 * self.deg_to_rad,
@@ -804,12 +864,14 @@ class Go2LidarLocalizationNode(Node):
                     -90 * self.deg_to_rad,
                     105 * self.deg_to_rad,
                     -105 * self.deg_to_rad,
-                    130 * self.deg_to_rad,
+                    120 * self.deg_to_rad,
+                    -120 * self.deg_to_rad,
+                    135 * self.deg_to_rad,
                     -135 * self.deg_to_rad,
-                    145 * self.deg_to_rad,
-                    -145 * self.deg_to_rad,
-                    160 * self.deg_to_rad,
-                    -160 * self.deg_to_rad,
+                    150 * self.deg_to_rad,
+                    -150 * self.deg_to_rad,
+                    165 * self.deg_to_rad,
+                    -165 * self.deg_to_rad,
                     180 * self.deg_to_rad,
                 ]
             else:
@@ -888,6 +950,18 @@ class Go2LidarLocalizationNode(Node):
         match_quality = max_sum / (len(self.scan_points) * 255)
         self.last_match_quality = match_quality
 
+        # Update confidence based on match quality
+        self.is_pose_confident = match_quality >= self.min_confidence_for_prediction
+        confidence_status = "confident" if self.is_pose_confident else "not confident"
+
+        self.get_logger().debug(
+            f"Match quality: {match_quality:.3f}, confidence threshold: {self.min_confidence_for_prediction:.3f} - {confidence_status}",
+            throttle_duration_sec=2.0,
+        )
+
+        # Check for consecutive failures and trigger automatic re-localization
+        self.check_and_handle_consecutive_failures(match_quality)
+
         # Publish localization pose
         try:
             map_to_base_transform = self.tf_buffer.lookup_transform(
@@ -918,10 +992,66 @@ class Go2LidarLocalizationNode(Node):
 
             self.localization_pose_pub.publish(msg)
 
+            self.get_logger().info(
+                f"Published localization pose - score: {max_sum}, quality: {match_quality*100:.2f}%, points: {len(self.scan_points)}, confident: {self.is_pose_confident}"
+            )
+
         except (TransformException, Exception) as e:
             self.get_logger().debug(
                 f"Failed to get transform for pose message: {str(e)}"
             )
+
+    def check_and_handle_consecutive_failures(self, match_quality: float):
+        """
+        Check for consecutive localization failures and trigger automatic re-localization
+
+        Parameters
+        ----------
+        match_quality: float
+            Current match quality score (0.0 to 1.0)
+        """
+        current_time = self.get_clock().now()
+
+        # Check if this is a failure
+        is_failure = match_quality < self.failure_quality_threshold
+
+        if is_failure:
+            self.consecutive_failures += 1
+            self.last_failure_time = current_time
+
+            self.get_logger().warn(
+                f"Localization failure detected (quality: {match_quality:.3f} < {self.failure_quality_threshold:.3f}). "
+                f"Consecutive failures: {self.consecutive_failures}/{self.max_consecutive_failures}"
+            )
+
+            # Check if we've reached the maximum consecutive failures
+            if self.consecutive_failures >= self.max_consecutive_failures:
+                self.get_logger().error(
+                    f"Maximum consecutive failures ({self.max_consecutive_failures}) reached. "
+                    "Triggering automatic re-localization..."
+                )
+
+                # Trigger automatic global localization
+                if self.buffered_scan is not None:
+                    self.get_logger().info("Starting automatic global re-localization")
+                    self.perform_global_localization(self.buffered_scan)
+                else:
+                    self.get_logger().warn(
+                        "No scan available for re-localization, will use next scan"
+                    )
+                    self.is_initialized = False
+
+                # Reset consecutive failure counter
+                self.consecutive_failures = 0
+
+        else:
+            # Success - reset consecutive failure counter
+            if self.consecutive_failures > 0:
+                self.get_logger().info(
+                    f"Localization recovered after {self.consecutive_failures} consecutive failures"
+                )
+                self.consecutive_failures = 0
+                self.last_failure_time = None
 
     def pose_tf(self):
         """
@@ -958,7 +1088,7 @@ class Go2LidarLocalizationNode(Node):
                 rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.05),
             )
-        except (TransformException, Exception) as e:
+        except (TransformException, Exception):
             return
 
         # Map to base transform

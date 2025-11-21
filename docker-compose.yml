@@ -2,15 +2,15 @@ version: '3.8'
 
 services:
   zenoh_bridge:
-    image: eclipse/zenoh-bridge-ros2dds:latest
+    build:
+      context: .
+    image: openmindagi/unitree_sdk:latest
     container_name: zenoh_bridge
     network_mode: host
     privileged: true
     environment:
       - ROS_DISTRO=humble
-    volumes:
-      - ./zenoh/zenoh_bridge_config.json5:/config/zenoh_bridge_config.json5:ro
-    command: "-c /config/zenoh_bridge_config.json5"
+    command: "zenoh-bridge-ros2dds -c /app/unitree_sdk/zenoh/zenoh_bridge_config.json5"
     logging:
       driver: "json-file"
       options:
@@ -33,7 +33,7 @@ services:
       - QT_X11_NO_MITSHM=1
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
-      - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_URI=file:///app/unitree_sdk/cyclonedds/cyclonedds.xml
       - CYCLONEDDS_INTERFACE=${CYCLONEDDS_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
       - OM_API_KEY_ID=${OM_API_KEY_ID:-}
@@ -42,7 +42,6 @@ services:
       - /dev:/dev
       - /run/udev:/run/udev:ro
       - /sys:/sys:ro
-      - ./cyclonedds:/cyclonedds
     logging:
       driver: "json-file"
       options:
@@ -81,7 +80,7 @@ services:
       - QT_X11_NO_MITSHM=1
       - ROS_DOMAIN_ID=0
       - CYCLONEDDS_HOME=/app/cyclonedds/install
-      - CYCLONEDDS_URI=file:///cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_URI=file:///app/unitree_sdk/cyclonedds/cyclonedds.xml
       - CYCLONEDDS_INTERFACE=${CYCLONEDDS_INTERFACE:-eno1}
       - OM_API_KEY=${OM_API_KEY:-}
       - ROBOT_TYPE=${ROBOT_TYPE:-}
@@ -90,9 +89,8 @@ services:
       - /dev:/dev
       - /run/udev:/run/udev:ro
       - /sys:/sys:ro
-      - ./cyclonedds:/cyclonedds
-      - ./maps:/app/unitree_go2_ros2_sdk/maps:rw
-      - ${HOME}/shared_data/locations:/app/unitree_go2_ros2_sdk/locations:rw
+      - ./maps:/app/unitree_sdk/maps:rw
+      - ./locations:/app/unitree_sdk/locations:rw
     logging:
       driver: "json-file"
       options:

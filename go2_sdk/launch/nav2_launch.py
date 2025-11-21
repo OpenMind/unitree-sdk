@@ -51,7 +51,7 @@ def generate_launch_description():
     global_localization_particles = LaunchConfiguration(
         "global_localization_particles",
         default=EnvironmentVariable(
-            "GLOBAL_LOCALIZATION_PARTICLES", default_value="10000"
+            "GLOBAL_LOCALIZATION_PARTICLES", default_value="5000"
         ),
     )
 
@@ -149,12 +149,6 @@ def generate_launch_description():
                     "--child-frame-id",
                     "laser",
                 ],
-                output="screen",
-            ),
-            Node(
-                package="topic_tools",
-                executable="relay",
-                arguments=["/utlidar/robot_odom", "/odom"],
                 output="screen",
             ),
             Node(
@@ -300,7 +294,7 @@ def generate_launch_description():
                 parameters=[
                     {"use_sim_time": False},
                     {"autostart": True},
-                    # {'node_names': ['map_server', 'amcl']}]
+                    # {'node_names': ['map_server', 'amcl']}
                     {"node_names": ["map_server"]},
                 ],
             ),

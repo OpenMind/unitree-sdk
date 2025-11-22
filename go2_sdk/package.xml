@@ -3,7 +3,7 @@
 <package format="3">
   <name>go2_sdk</name>
   <version>0.0.0</version>
-  <description>Unitree Go2 robot SLAM package with RPLidar</description>
+  <description>Unitree Go2 and G1 robot SDK with SLAM capabilities</description>
   <maintainer email="hello@openmind.org">OpenMind</maintainer>
   <license>MIT</license>
 

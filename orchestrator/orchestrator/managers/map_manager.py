@@ -19,7 +19,7 @@ class MapManager:
         maps_directory : str
             Directory where maps are stored.
         robot_type : str
-            Type of robot (e.g., "g1", "go2", "default").
+            Type of robot (e.g., "g1", "go2").
         logger
             Logger instance for logging operations.
         """
